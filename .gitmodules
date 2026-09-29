@@ -1,0 +1,7 @@
+[submodule "lib/cwist"]
+	path = lib/cwist
+	url = https://github.com/religiya-serdtsa/cwist
+	branch = main
+[submodule "lib/md4c"]
+	path = lib/md4c
+	url = https://github.com/mity/md4c

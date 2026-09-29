@@ -1,0 +1,181 @@
+name: Deploy Blog
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "posts/**"
+      - "categories.cfg"
+      - "assets/**"
+      - "tools/**"
+      - "blog/**"
+      - "index.html"
+      - "Makefile"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up Emscripten SDK
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.74'
+          actions-cache-folder: '.emsdk-cache'
+
+      - name: Build WASM search module
+        continue-on-error: true
+        run: make wasm-search
+
+      - name: Generate static site from root posts
+        id: static_build
+        continue-on-error: true
+        run: make clean static-site
+
+      - name: Fallback live markdown render site (when static build fails)
+        if: steps.static_build.outcome != 'success'
+        run: |
+          python3 - <<'PY'
+          import json
+          import shutil
+          from pathlib import Path
+          from html import escape
+          import re
+
+          root = Path(".")
+          posts_root = root / "posts"
+          docs_root = root / "docs"
+
+          if docs_root.exists():
+              shutil.rmtree(docs_root)
+          (docs_root / "assets").mkdir(parents=True, exist_ok=True)
+          (docs_root / "post").mkdir(parents=True, exist_ok=True)
+          (docs_root / "data").mkdir(parents=True, exist_ok=True)
+
+          for asset in [
+              "styles.css",
+              "post-renderer.js",
+              "theme-toggle.js",
+              "comments.js",
+              "search-ui.js",
+              "search-module.js",
+              "search-module.wasm",
+          ]:
+              src = root / "assets" / asset
+              if src.exists():
+                  shutil.copy2(src, docs_root / "assets" / asset)
+
+          comments_src = root / "data" / "comments.json"
+          if comments_src.exists():
+              shutil.copy2(comments_src, docs_root / "data" / "comments.json")
+          else:
+              (docs_root / "data" / "comments.json").write_text("{}", encoding="utf-8")
+
+          title_re = re.compile(r'^title:\s*(.+?)\s*$', re.IGNORECASE)
+          posts = []
+
+          for md in sorted(posts_root.rglob("*.md")):
+              rel = md.relative_to(posts_root)
+              category = rel.parts[0] if len(rel.parts) > 1 else "post"
+              slug = md.stem
+              text = md.read_text(encoding="utf-8", errors="replace")
+              title = slug
+              for line in text.splitlines():
+                  m = title_re.match(line.strip())
+                  if m:
+                      title = m.group(1).strip().strip('"').strip("'") or slug
+                      break
+
+              out_dir = docs_root / "post" / category / slug
+              out_dir.mkdir(parents=True, exist_ok=True)
+              html = f"""<!doctype html>
+          <html lang="ko">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>{escape(title)} - Style and Grace</title>
+            <link rel="stylesheet" href="../../../assets/styles.css" />
+          </head>
+          <body>
+            <main class="content-wrap article-wrap">
+              <h1>{escape(title)}</h1>
+              <div class="divider"></div>
+              <div class="article-body" id="article-body"></div>
+              <script id="post-markdown" type="application/json">{json.dumps(text, ensure_ascii=False)}</script>
+              <script src="../../../assets/post-renderer.js"></script>
+            </main>
+          </body>
+          </html>
+          """
+              (out_dir / "index.html").write_text(html, encoding="utf-8")
+              posts.append((title, category, slug))
+
+          posts.sort(key=lambda x: (x[1], x[0].lower()))
+          index_items = "\n".join(
+              f'<li><a href="./post/{escape(c)}/{escape(s)}/">{escape(t)}</a></li>'
+              for t, c, s in posts
+          ) or "<li>No posts found.</li>"
+
+          index_html = f"""<!doctype html>
+          <html lang="ko">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Style and Grace</title>
+            <link rel="stylesheet" href="./assets/styles.css" />
+          </head>
+          <body>
+            <main class="content-wrap">
+              <h1>Style and Grace</h1>
+              <p>정적 렌더가 실패하여 live markdown 렌더 fallback 페이지로 제공됩니다.</p>
+              <ul>{index_items}</ul>
+            </main>
+          </body>
+          </html>
+          """
+          (docs_root / "index.html").write_text(index_html, encoding="utf-8")
+          (docs_root / ".nojekyll").write_text("", encoding="utf-8")
+          PY
+
+      - name: Validate generated site output
+        run: |
+          test -d docs
+          test -f docs/index.html
+
+      - name: Build publish directory
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp index.html _site/index.html
+          cp -a docs _site/docs
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './_site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

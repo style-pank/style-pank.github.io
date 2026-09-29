@@ -1,0 +1,40 @@
+(function () {
+  'use strict';
+
+  var mount = document.getElementById('home-eye-candy');
+  if (!mount) return;
+
+  var title = '블로그 빠른 둘러보기';
+  var desc = '카테고리 중심으로 최근 글 흐름을 바로 확인할 수 있습니다.';
+
+  function collectChips() {
+    var titles = Array.prototype.slice.call(
+      document.querySelectorAll('.cat-card-title')
+    )
+      .map(function (el) { return (el.textContent || '').trim(); })
+      .filter(Boolean)
+      .slice(0, 5);
+    if (!titles.length) return '포스트,카테고리,검색';
+    return titles.join(',');
+  }
+
+  var palette = collectChips();
+
+  function renderHomeOverview() {
+    mount.innerHTML = [
+      '<section class="han-eye">',
+      '  <div class="han-eye-header">',
+      '    <h2 class="han-eye-title">' + title + '</h2>',
+      '    <p class="han-eye-desc">' + desc + '</p>',
+      '  </div>',
+      '  <div class="han-palette">',
+      palette.split(',').map(function (item) {
+        return '<span class="han-chip">' + item + '</span>';
+      }).join(''),
+      '  </div>',
+      '</section>'
+    ].join('');
+  }
+
+  renderHomeOverview();
+}());

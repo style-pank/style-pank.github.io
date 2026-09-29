@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자바의 추상 클래스는 때로 유지 보수 비용을 늘린다 – Style and Grace</title>
+<link rel="stylesheet" href="../../../assets/styles.css">
+<style>:root{--accent:#4a6fa3;--accent-hover:#8fa9c9;}</style>
+</head>
+<body>
+<div class="site-wrap">
+<header class="site-header">
+<nav class="nav">
+<a class="brand" href="../../../"><span class="brand-hex"><img src="../../../assets/favicon/favicon.ico" alt="Style and Grace logo"></span><span>Style and Grace</span></a>
+<ul class="nav-list">
+<li><a href="../../../category/posts/">Posts</a></li>
+<li><a href="../../../category/culture-news/">Culture News</a></li>
+<li><a class="active" href="../../../category/korean/">Korean</a></li>
+<li><a href="../../../category/russian/">Russian</a></li>
+<li><a href="../../../category/english/">English</a></li>
+<li><a href="../../../search/">검색</a></li>
+<li><a href="../../../relations/">Relations</a></li>
+</ul>
+<div class="nav-actions"><button class="theme-toggle" type="button" data-theme-toggle aria-label="Light mode" title="Light mode">☀️ Light</button></div>
+</nav>
+</header>
+<main class="main">
+<div class="article-wrap">
+<nav class="breadcrumb"><a href="../../../">홈</a><span class="bc-sep">/</span><a href="../../../category/korean/">Korean</a><span class="bc-sep">/</span><span>자바의 추상 클래스는 때로 유지 보수 비용을 늘린다</span></nav>
+<header class="article-header">
+<div class="tags">
+<span class="tag">Software</span>
+<span class="tag">Tools</span>
+<span class="tag">UI/UX</span>
+<span class="tag">Algorithm</span>
+<span class="tag">Java</span>
+</div>
+<h1 class="article-title">자바의 추상 클래스는 때로 유지 보수 비용을 늘린다</h1>
+<div class="article-meta">
+<time>2026-03-19</time>
+<span class="dot">&middot;</span>
+<span>2 min read</span>
+</div>
+</header>
+<div class="divider"></div>
+<div class="article-body" id="article-body"></div>
+<script id="post-markdown" type="application/json">"---\ntitle: 자바의 추상 클래스는 때로 유지 보수 비용을 늘린다\ndate: 2026-03-19\nexcerpt: 자바에서 추상 클래스가 불러오는 부작용\ntags: Software, Tools, UI/UX, Algorithm, Java\nreading_minutes: 2\n---\n\n## 자바의 추상 클래스, 뭐가 문제인가?\n\n회사에서 인턴 직무를 수행하며 교육 기간동안 사수님께 '자바의 추상 클래스와 인터페이스의 용례가 이상하다'는 질문을 했다. 그도 그럴 것이, 최신 자바까지 가지 않더라도 레거시인 자바 1.8에서도 인터페이스가 아닌 추상 클래스를 반드시 써야만 하는 상황이 있는지 역시 의문이 들었다. 그리고 그에 대한 대답은 '특별한 사유가 없다면 지양해야 한다'는 의견이었다.\n\n### 조류에 대한 비유\n\n만약 우리가 조류형 NPC를 만든다고 해 보자. 조류는 기본적으로 두 발로 걷고, 깃털이 있다. 밥을 먹고, 눈이 있는 등의 공통 특성도 공유한다.\n이 때 추상 클래스를 통한 방법을 생각해 보면 꽤나 골치가 아파진다.\n책에서 발췌한 문장으로는 추상 클래스는 '조상 클래스'라고 쓰여 있었다. 이러한 개념으로 본다면 조류에 대한 분류는 이러할 것이다.\n\n**척추동물-석형류-수각류-조류**\n\n**조류:**\n - 까마귀(지능 좋음)\n - 타조(달리기 메소드 추가, 날기 없음)\n - 닭(날기 정도 약함)\n - 독수리(시력 오버라이드, 날기 좋음, 지능 좋음)\n - 참새(지능 좋음, 걷기 나쁨, 뛰기 있음)\n\n이런 방식으로 하나하나 기본이 되는 클래스에서 오버라이딩하면 얼핏 보기에 구조가 질서정연해 보이지만 걷기, 날기 등을 하나하나 오버라이딩하고 그 선후관계를 분석해야 하는 유지보수 지옥에 빠질 수 있다.\n이것은 기업의 유지 보수 비용 측면에서도 부작용이 크나 개인 개발자가 재미 삼아 만드는 프로젝트의 경우에서조차 피해야 한다. 예를 들면 A를 보수하는 데에 B, C, D, E 등의 것을 모두 보수해야 한다면 난이도는 급상승한다.\n\n그러나, 필요한 메서드들을 인터페이스에 정의하고 요구된 함수들을 개별 클래스에서 정의하면 자칫 중복이 많다고 생각할 수도 있으나 이론적 단점과 별개로 A에 문제가 생기면 A만 수정하면 된다. 또한 *A계열*로  범위가 확장되더라도 인터페이스, A 정도만 수정해서 동계 클래스들이 일하기 위한 준비가 끝난다.\n\n이러한 것을 도식으로 나타내면 이러하다.\n\n조류라는 분류 (까마귀, 타조, 닭, 독수리, 참새는 조류를 구현함)\n\n이런 수평적인 구조는 과하면 선후관계와 책임이 흐려지나 적절하면 모듈화가 될 수 있다.\n\n## 자바는 문법이 세밀하지만...\n\n자바는 문법이 세밀하지만 C와 달리 *대체로 비슷한 결론*에 합의한다는 개념이 희박하다. 따라서 자바 코드는 프레임워크 종속적으로 스타일이 바뀐다. 물론 언어 스펙으론 C나 Go 등이 일견 더 자유로워보이나 실상은 자바가 더 자유방임적으로 흘러가는 언어가 아닌가 생각한다.\n\n좋은 예시로, C나 Go는 주방 칼이고 자바는 레고라고 생각한다. C, Go 등이 실무에서 어느 정도 균일한 결과로 수렴할 때 자바는 어떻게 작성할 지는 조립하는 사람 마음인 셈이다. 게다가 C처럼 C99 등의 교체해야 할 레거시와 C23 등의 차세대 표준이 상위 확장의 개념이 아닌 지점이 존재한다. 즉 OpenJDK 21로 OpenJDK 8을 위해 작성된 코드를 실행시킬 때에 동작은 보장할 수 있으나 Java 1.8 자체와 완전히 동일한 방식으로 동작하는지는 보장하기 힘들다는 뜻이다.\n\n당연한 것이 주방 칼은 쥐는 법이 달라도 뭔가를 썰거나 발라내는 큰 틀이 같다. 그러나 레고는 카네이션 레고를 줘도 로봇을 만들 수도 있다. 어떻게 보면, 조립할 구석이 많은지 아니면 대체로 정해져 있는 것인지가 스펙 상의 자유보다 더 통제성에 대한 비교 척도로 적절하지 않은가 싶다.\n\n## 무방비 상태로 두지 말자\n\n회사에서 3개월 간 자바 교육 겸 수습을 진행하게 된 상황에 대해서도 암기가 아닌 스타일에 대한 공부의 연장선으로 흐름을 가져갈까 생각한다. 이것을 공부하고 어떤 것이 '작고 한 가지 일만 잘 하는 바보 기계'에 적합한지는 뻔한 지킬 블로그가 아닌 이곳에 작성하여 과시가 아닌 개인의 탐구로 끌고 들어가겠다는 의지를 내비쳐 보겠다고 자신한다.\n언어가 아무 보호 없이 개발자를 정글에 던지더라도 정글에서 움막을 지을 수 있어야 한다. 그러한 관점에서 있는 문법 중 무엇을 위주로 쓰고 무엇을 피할 지에 대한 조언과 사유를 기록하고 복기할 생각이다.\n"</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>window.MathJax={tex:{inlineMath:[['$','$'],["\\(","\\)"]],displayMath:[['$$','$$'],["\\[","\\]"]]},svg:{fontCache:'global'}};</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+<script src="../../../assets/search-module.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="../../../assets/post-renderer.js"></script>
+<footer class="article-footer">
+<a class="back-link" href="../../../category/korean/">&larr; Korean로 돌아가기</a>
+</footer>
+<section class="comment-section" id="comment-section" data-slug="korean/about-java-abstract-class">
+<h2 class="comment-section-title" id="comment-section-title"></h2>
+<div id="comment-count" class="comment-count"></div>
+<div id="comment-list" class="comment-list"></div>
+<div class="comment-form">
+<h3 id="comment-form-title" class="comment-form-title"></h3>
+<p id="comment-form-note" class="comment-form-note"></p>
+<textarea id="comment-body" class="comment-textarea" rows="4"></textarea>
+<button id="comment-submit" class="comment-submit" type="button"></button>
+</div>
+</section>
+<script src="../../../assets/comments.js"></script>
+</div>
+
+</main>
+<footer class="site-footer">
+<p>GitHub Pages</p>
+</footer>
+<script src="../../../assets/theme-toggle.js"></script>
+<script src="../../../assets/home-layout-fallback.js"></script>
+</div>
+</body>
+</html>

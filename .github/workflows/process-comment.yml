@@ -1,0 +1,78 @@
+name: Process Comment
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  add-comment:
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.issue.title, '[comment]')
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Append comment to database
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            const title = context.payload.issue.title;
+            const match = title.match(/^\[comment\]\s+(.+)/);
+            if (!match) {
+              core.setFailed('Cannot parse post slug from title: ' + title);
+              return;
+            }
+
+            const slug       = match[1].trim();
+            const author     = context.payload.issue.user.login;
+            const body       = (context.payload.issue.body || '').trim();
+            const created_at = context.payload.issue.created_at;
+            const id         = String(context.payload.issue.number);
+
+            fs.mkdirSync('data', { recursive: true });
+
+            let comments = {};
+            try {
+              comments = JSON.parse(fs.readFileSync('data/comments.json', 'utf8'));
+            } catch (_) {}
+
+            if (!Array.isArray(comments[slug])) comments[slug] = [];
+            comments[slug].push({ id, author, body, created_at });
+
+            fs.writeFileSync(
+              'data/comments.json',
+              JSON.stringify(comments, null, 2) + '\n'
+            );
+
+      - name: Commit updated comments database
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/comments.json
+          git diff --cached --quiet || git commit -m "chore: add comment on ${{ github.event.issue.title }}"
+          git push
+
+      - name: Close issue with acknowledgement
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              issue_number: context.issue.number,
+              body:         '감사합니다! 댓글이 등록되었습니다. ✨\n\n잠시 후 블로그에서 확인하실 수 있습니다.'
+            });
+            await github.rest.issues.update({
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              issue_number: context.issue.number,
+              state:        'closed'
+            });

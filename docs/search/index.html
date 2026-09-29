@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>검색 – Style and Grace</title>
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+<div class="site-wrap">
+<header class="site-header">
+<nav class="nav">
+<a class="brand" href="../"><span class="brand-hex"><img src="../assets/favicon/favicon.ico" alt="Style and Grace logo"></span><span>Style and Grace</span></a>
+<ul class="nav-list">
+<li><a href="../category/posts/">Posts</a></li>
+<li><a href="../category/culture-news/">Culture News</a></li>
+<li><a href="../category/korean/">Korean</a></li>
+<li><a href="../category/russian/">Russian</a></li>
+<li><a href="../category/english/">English</a></li>
+<li><a href="../search/">검색</a></li>
+<li><a href="../relations/">Relations</a></li>
+</ul>
+<div class="nav-actions"><button class="theme-toggle" type="button" data-theme-toggle aria-label="Light mode" title="Light mode">☀️ Light</button></div>
+</nav>
+</header>
+<main class="main">
+<div class="search-wrap">
+<h1 class="search-page-title">포스트 검색</h1>
+<div class="search-box">
+<input type="search" id="search-input" class="search-input" placeholder="검색어를 입력하세요..." disabled autocomplete="off" spellcheck="false">
+</div>
+<p id="search-no-result" class="search-no-result" hidden>결과 없음</p>
+<div id="search-results" class="search-results" role="listbox" aria-live="polite"></div>
+</div>
+<script src="../assets/search-module.js"></script>
+<script src="../assets/search-ui.js"></script>
+
+</main>
+<footer class="site-footer">
+<p>GitHub Pages</p>
+</footer>
+<script src="../assets/theme-toggle.js"></script>
+<script src="../assets/home-layout-fallback.js"></script>
+</div>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relations – Style and Grace</title>
+<link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+<div class="site-wrap">
+<header class="site-header">
+<nav class="nav">
+<a class="brand" href="../"><span class="brand-hex"><img src="../assets/favicon/favicon.ico" alt="Style and Grace logo"></span><span>Style and Grace</span></a>
+<ul class="nav-list">
+<li><a href="../category/posts/">Posts</a></li>
+<li><a href="../category/culture-news/">Culture News</a></li>
+<li><a href="../category/korean/">Korean</a></li>
+<li><a href="../category/russian/">Russian</a></li>
+<li><a href="../category/english/">English</a></li>
+<li><a href="../search/">검색</a></li>
+<li><a href="../relations/">Relations</a></li>
+</ul>
+<div class="nav-actions"><button class="theme-toggle" type="button" data-theme-toggle aria-label="Light mode" title="Light mode">☀️ Light</button></div>
+</nav>
+</header>
+<main class="main">
+<section class="relations-wrap">
+<h1 class="search-page-title">Relations Mesh</h1>
+<p class="relations-desc">WASM Kernel이 모든 게시물의 태그를 비교해 연결 구조를 그립니다.</p>
+<div class="relations-stage">
+<canvas id="relations-canvas" class="relations-canvas" aria-label="post relations graph"></canvas>
+</div>
+<p id="relations-legend" class="relations-legend">로딩 중...</p>
+</section>
+<script src="../assets/search-module.js"></script>
+<script src="../assets/relations-ui.js"></script>
+
+</main>
+<footer class="site-footer">
+<p>GitHub Pages</p>
+</footer>
+<script src="../assets/theme-toggle.js"></script>
+<script src="../assets/home-layout-fallback.js"></script>
+</div>
+</body>
+</html>
