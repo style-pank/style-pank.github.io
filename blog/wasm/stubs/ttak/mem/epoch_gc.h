@@ -2,6 +2,7 @@
 #define __TTAK_MEM_EPOCH_GC_H__
 
 #include <stddef.h>
+#include <stdlib.h>
 
 typedef void (*ttak_epoch_gc_free_fn)(void *);
 

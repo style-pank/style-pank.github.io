@@ -2,22 +2,6 @@
 #include <cwist/core/mem/alloc.h>
 #include <stdlib.h>
 
-void ttak_epoch_gc_init(ttak_epoch_gc_t *gc, ttak_epoch_gc_free_fn free_fn, void *ctx) {
-    // Stub
-}
-
-void ttak_epoch_gc_shutdown(ttak_epoch_gc_t *gc) {
-    // Stub
-}
-
-void ttak_epoch_gc_rotate(ttak_epoch_gc_t *gc) {
-    // Stub
-}
-
-void ttak_epoch_gc_retire(ttak_epoch_gc_t *gc, void *ptr) {
-    if (ptr) free(ptr);
-}
-
 static void free_ptr(void *ptr) {
     if (ptr) free(ptr);
 }

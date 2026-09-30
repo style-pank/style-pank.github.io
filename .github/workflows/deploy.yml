@@ -43,7 +43,6 @@ jobs:
           actions-cache-folder: '.emsdk-cache'
 
       - name: Build WASM search module
-        continue-on-error: true
         run: make wasm-search
 
       - name: Generate static site from root posts
@@ -179,3 +178,9 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Fail run if static build fell back
+        if: steps.static_build.outcome != 'success'
+        run: |
+          echo "::error::Static site build failed; deployed the fallback renderer instead."
+          exit 1
