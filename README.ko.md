@@ -59,7 +59,7 @@ Style and Grace는 GitHub Pages 기반 블로그이며, 포스트 본문·검색
 
 ```bash
 git submodule update --init lib/md4c lib/cwist
-git -C lib/cwist submodule update --init --depth 1 lib/cjson lib/libttak lib/boringssl
+git -C lib/cwist submodule update --init --filter=blob:none lib/cjson lib/libttak lib/boringssl
 ```
 
 툴체인(버전은 `lib/cwist` CI와 동일): wasi-sdk 25, wasm-tools 1.259, wit-bindgen 0.62, Node 22.

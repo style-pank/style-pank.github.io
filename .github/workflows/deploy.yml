@@ -41,8 +41,9 @@ jobs:
       # wasip2 archive compiles against (headers from boringssl, no lsquic).
       - name: Fetch submodules
         run: |
-          git submodule update --init --depth 1 lib/md4c lib/cwist
-          git -C lib/cwist submodule update --init --depth 1 lib/cjson lib/libttak lib/boringssl
+          # Partial clones: pinned commits need not be branch tips (--depth 1 cannot reach them).
+          git submodule update --init --filter=blob:none lib/md4c lib/cwist
+          git -C lib/cwist submodule update --init --filter=blob:none lib/cjson lib/libttak lib/boringssl
 
       - name: Set up Node
         uses: actions/setup-node@v4

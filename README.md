@@ -60,7 +60,7 @@ Initialize only the submodules the build needs:
 
 ```bash
 git submodule update --init lib/md4c lib/cwist
-git -C lib/cwist submodule update --init --depth 1 lib/cjson lib/libttak lib/boringssl
+git -C lib/cwist submodule update --init --filter=blob:none lib/cjson lib/libttak lib/boringssl
 ```
 
 Toolchain (same pins as `lib/cwist` CI): wasi-sdk 25, wasm-tools 1.259, wit-bindgen 0.62, Node 22.
