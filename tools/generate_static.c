@@ -684,11 +684,18 @@ static void render_page(blog_catalog_t *catalog,
     cwist_sstring_append(out, "</title>\n<link rel=\"stylesheet\" href=\"");
     cwist_sstring_append(out, root_prefix);
     cwist_sstring_append(out, "assets/styles.css\">\n");
+    /* CWIST WASI 0.2 render component loader: publishes window.CwistBlog
+     * before any page script asks for it. */
+    cwist_sstring_append(out, "<script src=\"");
+    cwist_sstring_append(out, root_prefix);
+    cwist_sstring_append(out, "assets/cwist-runtime.js\"></script>\n");
     if (accent_primary && accent_secondary) {
         cwist_sstring_append(out, "<style>:root{--accent:");
         cwist_sstring_append(out, accent_primary);
         cwist_sstring_append(out, ";--accent-hover:");
         cwist_sstring_append(out, accent_secondary);
+        cwist_sstring_append(out, ";--section-tint:");
+        cwist_sstring_append(out, accent_primary);
         cwist_sstring_append(out, ";}</style>\n");
     }
     cwist_sstring_append(out,
@@ -771,7 +778,6 @@ static void build_home(blog_catalog_t *catalog, const char *out_dir) {
     cwist_sstring_append(content, "</div>\n</section>\n");
 
     cwist_sstring_append(content,
-        "<script src=\"assets/search-module.js\"></script>\n"
         "<script src=\"assets/home-eye-candy.js\"></script>\n");
 
     render_page(catalog, "Style and Grace", NULL, NULL, NULL, content, "", page);
@@ -970,8 +976,6 @@ static void build_post_page(blog_catalog_t *catalog, blog_category_t *cat,
     cwist_sstring_append(content, "<script src=\"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js\"></script>\n");
     cwist_sstring_append(content, "<script>window.MathJax={tex:{inlineMath:[['$','$'],[\"\\\\(\",\"\\\\)\"]],displayMath:[['$$','$$'],[\"\\\\[\",\"\\\\]\"]]},svg:{fontCache:'global'}};</script>\n");
     cwist_sstring_append(content, "<script defer src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js\"></script>\n");
-    cwist_sstring_append(content, "<script src=\"../../../assets/search-module.js\"></script>\n");
-    cwist_sstring_append(content, "<script src=\"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js\"></script>\n");
     cwist_sstring_append(content, "<script src=\"../../../assets/post-renderer.js\"></script>\n");
 
     /* article footer: back link */
@@ -1136,7 +1140,6 @@ static void build_search_page(blog_catalog_t *catalog, const char *out_dir) {
         "<div id=\"search-results\" class=\"search-results\""
         " role=\"listbox\" aria-live=\"polite\"></div>\n"
         "</div>\n"
-        "<script src=\"../assets/search-module.js\"></script>\n"
         "<script src=\"../assets/search-ui.js\"></script>\n");
 
     render_page(catalog,
@@ -1166,7 +1169,6 @@ static void build_relations_page(blog_catalog_t *catalog, const char *out_dir) {
         "</div>\n"
         "<p id=\"relations-legend\" class=\"relations-legend\">로딩 중...</p>\n"
         "</section>\n"
-        "<script src=\"../assets/search-module.js\"></script>\n"
         "<script src=\"../assets/relations-ui.js\"></script>\n");
 
     render_page(catalog,

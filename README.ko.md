@@ -1,100 +1,76 @@
 # Style and Grace
 
-Style and Grace는 GitHub Pages 기반 블로그/사이트이며, 포스트 본문 렌더링의 기준 경로를 **클라이언트 사이드 JavaScript**로 두는 구조입니다.
+Style and Grace는 GitHub Pages 기반 블로그이며, 포스트 본문·검색·댓글·관계도 렌더링을
+**CWIST WASI 0.2 컴포넌트**가 브라우저 안에서 수행합니다.
 
-포스트 Markdown 원문은 브라우저로 전달되고, 런타임에서 `assets/post-renderer.js`가 HTML로 렌더링합니다.
-
----
-
-## 왜 클라이언트 사이드 렌더링인가
-
-이 프로젝트는 Markdown 렌더링 규칙을 브라우저 렌더러 하나로 통일합니다.
-
-- 동일한 front matter 분리 동작
-- 섹션별 Markdown 렌더링 분기 없음
-- article body에 raw markdown를 직접 주입하는 fallback 제거
-
-결과적으로 카테고리별 동작 차이나 경로별 렌더링 불일치를 줄일 수 있습니다.
+렌더링 커널(`blog/wasm`)은 `wasm32-wasip2`로 빌드한 CWIST 앱이고, CWIST의
+`cwist-guest` WIT 월드(`lib/cwist/wit/cwist.wit`)를 export합니다. 페이지 스크립트는
+이 컴포넌트에 HTTP/1.1 요청을 보내듯이 렌더링을 요청합니다.
 
 ---
 
 ## 아키텍처 개요
 
-### 기준 포스트 렌더링 경로
+### 빌드 파이프라인 (`make wasm-blog`)
 
-1. 정적 생성기가 페이지 셸과 메타데이터(제목/날짜/태그 등)를 생성합니다.
-2. 포스트 원문 Markdown을 JSON 스크립트(`#post-markdown`)에 담아 페이지에 포함합니다.
-3. `assets/post-renderer.js`가 Markdown payload를 파싱하고 렌더링합니다.
-4. JS가 렌더링된 HTML을 `#article-body`에 삽입합니다.
+1. **wasi-sdk clang** — `blog/wasm/*.c` + md4c를 `libcwist_wasip2`와 함께 reactor 코어 모듈로 링크
+2. **wit-bindgen** — `cwist-guest` 월드의 canonical ABI 바인딩 생성
+3. **wasm-tools component embed** — WASI 0.2 컴포넌트(`blog.component.wasm`) 생성
+4. **jco transpile** (`--no-nodejs-compat --tla-compat`) — 브라우저용 ES 모듈 + 코어 wasm 샤드
+5. **esbuild** — jco 출력 + cwist-wasm 컴포넌트 어댑터 + preview2-shim 브라우저 빌드를
+   `assets/cwist-blog.mjs`로 번들
 
-### 보조 도구
+### 런타임 경로
 
-정적 생성기(`tools/generate_static.c`, `bin/bloggen`)는 홈/카테고리/검색 인덱스/네비게이션/에셋 배치를 위해 사용됩니다.
+1. `assets/cwist-runtime.js`가 모든 페이지 `<head>`에서 `window.CwistBlog.ready`를 공개하고
+   `cwist-blog.mjs`를 모듈로 로드합니다.
+2. 페이지 스크립트는 `CwistBlog.ready`가 넘겨주는 클라이언트로 컴포넌트 안의 CWIST 라우트를 호출합니다.
 
----
+| 라우트 | 요청 본문 | 응답 | 사용처 |
+|---|---|---|---|
+| `POST /render/markdown` | markdown | HTML | `post-renderer.js` |
+| `POST /render/comments` | 댓글 JSON 배열 | HTML (raw HTML 차단) | `comments.js` |
+| `POST /render/home` | `{title,description,chips}` | HTML | `home-eye-candy.js` |
+| `PUT /search/index` | `search-index.json` | 204 | `search-ui.js` |
+| `POST /search` | 검색어 | 결과 카드 HTML | `search-ui.js` |
+| `POST /relations` | `search-index.json` | `{edges:[{a,b,w}]}` | `relations-ui.js` |
+| `POST /theme` | `location.pathname` | 섹션 accent JSON | `theme-toggle.js` |
 
-## 렌더링 파이프라인 상세
-
-- **입력:** front matter를 포함할 수 있는 전체 markdown 원문
-- **front matter 분리:** `assets/post-renderer.js`
-- **본문 렌더링:** 브라우저 JS 렌더러
-- **출력:** article body에 HTML 문자열 반영
-
-보장되는 동작:
-
-- front matter가 본문 렌더 결과에 노출되지 않음
-- article body는 raw markdown가 아니라 렌더링된 HTML만 표시
+컴포넌트를 불러오지 못하면(`ready` reject) 각 스크립트는 순수 JS fallback으로 렌더링합니다.
 
 ---
 
 ## 디렉터리 / 구성요소 안내
 
-- `assets/post-renderer.js`  
-  브라우저 렌더러(front matter 분리 및 markdown-to-HTML 변환)
-
-- `tools/generate_static.c`  
-  페이지 셸/인덱스/네비게이션 생성기
-
-- `assets/search-ui.js`, `blog/wasm/search.c`  
-  검색 UI 및 검색 WASM 점수 모듈
-
-- `posts/<category>/*.md`  
-  포스트 원본 markdown(front matter 포함 가능)
-
-- `docs/`  
-  GitHub Pages 배포용 생성 결과물
+- `blog/wasm/blog_guest.c` — CWIST 앱 라우트와 `cwist-guest` export 구현
+- `blog/wasm/*.c` — markdown/댓글/검색/관계도/테마 렌더링 커널
+- `blog/js/cwist-blog-entry.js` — 브라우저 번들 엔트리
+- `blog/package.json` — jco / preview2-shim / esbuild 버전 고정
+- `assets/cwist-runtime.js` — 컴포넌트 로더
+- `tools/generate_static.c` — 페이지 셸/인덱스/네비게이션 생성기 (네이티브 C)
+- `posts/<category>/*.md` — 포스트 원본 markdown
+- `docs/` — GitHub Pages 배포용 생성 결과물
 
 ---
 
 ## 개발/빌드 메모
 
-먼저 서브모듈을 초기화합니다.
+필요한 서브모듈만 초기화합니다.
 
 ```bash
-git submodule update --init --recursive
+git submodule update --init lib/md4c lib/cwist
+git -C lib/cwist submodule update --init --depth 1 lib/cjson lib/libttak lib/boringssl
 ```
 
-정적 사이트 출력 생성:
+툴체인(버전은 `lib/cwist` CI와 동일): wasi-sdk 25, wasm-tools 1.259, wit-bindgen 0.62, Node 22.
 
 ```bash
-make clean static-site
+make wasm-blog WASI_SDK=$HOME/toolchains/wasi-sdk-25.0-x86_64-linux   # 컴포넌트 + 번들
+make clean static-site                                                # docs/ 생성
+# 또는 한 번에: make site WASI_SDK=...
 ```
 
-검색 WASM 모듈 빌드(Emscripten 필요):
-
-```bash
-make wasm-search
-```
-
-일반적인 로컬 작업 흐름:
-
-1. posts / styles / generator / renderer 수정
-2. 검색 로직 변경 시 wasm 재빌드
-3. `make clean static-site` 실행
-4. 생성된 `docs/post/**/index.html`에서 다음 확인
-   - `#article-body`가 초기 비어 있음
-   - `#post-markdown` JSON payload 존재
-   - post renderer 스크립트 로드
+`wasm-tools`/`wit-bindgen`이 PATH에 없다면 `WASM_TOOLS=`/`WIT_BINDGEN=`으로 경로를 지정합니다.
 
 ---
 
@@ -120,8 +96,6 @@ GitHub Pages 스타일로 이미지를 첨부하려면 다음 절차를 따르�
 
 ## 현재 상태와 한계
 
-- 포스트 페이지 본문은 클라이언트 JavaScript 경로가 기준입니다.
-- 검색은 별도의 WASM + 인덱스 경로를 사용합니다.
-- 카테고리 목록 페이지는 현재 사전 렌더링된 HTML 스니펫을 사용합니다.
-- WASM 모듈 빌드에는 Emscripten 환경이 필요합니다.
+- `cwist-guest` 월드는 동기 `dispatch` 하나뿐이라, jco가 만든 내보내기 호출은 메인 스레드에서 실행됩니다.
+- 카테고리 목록 페이지는 사전 렌더링된 HTML 스니펫을 사용합니다.
 - 정적 생성기는 빌드 시 포스트 원문을 메모리에 보관합니다.

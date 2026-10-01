@@ -5,29 +5,6 @@
   var DEFAULT_THEME = 'dark';
   var root = document.documentElement;
 
-  var wasmMod = null;
-
-  function hexToRgb(hex) {
-    if (wasmMod && typeof wasmMod.ccall === 'function') {
-      var rPtr = wasmMod._malloc(4);
-      var gPtr = wasmMod._malloc(4);
-      var bPtr = wasmMod._malloc(4);
-      wasmMod.ccall('cwist_hex_to_rgb', null, ['string', 'number', 'number', 'number'], [hex, rPtr, gPtr, bPtr]);
-      var r = wasmMod.getValue(rPtr, 'i32');
-      var g = wasmMod.getValue(gPtr, 'i32');
-      var b = wasmMod.getValue(bPtr, 'i32');
-      wasmMod._free(rPtr);
-      wasmMod._free(gPtr);
-      wasmMod._free(bPtr);
-      return { r: r, g: g, b: b };
-    }
-    // Minimal fallback
-    var normalized = String(hex || '').replace('#', '');
-    if (normalized.length !== 6) return null;
-    var value = parseInt(normalized, 16);
-    return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
-  }
-
   function applyTheme(theme) {
     if (theme === 'light' || theme === 'dark') {
       root.setAttribute('data-theme', theme);
@@ -93,25 +70,19 @@
     updateButtons();
   }
 
-  function syncMenuAccent() {
-    if (!wasmMod) return;
-
-    var sectionPtr = wasmMod.ccall('cwist_get_section_from_path', 'number', ['string'], [window.location.pathname]);
-    var section = wasmMod.UTF8ToString(sectionPtr);
+  // Section accent comes from the CWIST component (POST /theme).
+  function syncMenuAccent(theme) {
+    var section = theme && theme.section;
     if (!section) return;
 
-    var accentPtr = wasmMod.ccall('cwist_get_accent_for_section', 'number', ['string'], [section]);
-    var accent = wasmMod.UTF8ToString(accentPtr);
-    var hoverPtr = wasmMod.ccall('cwist_get_hover_for_section', 'number', ['string'], [section]);
-    var hover = wasmMod.UTF8ToString(hoverPtr);
-
-    if (accent && hover) {
-      root.style.setProperty('--accent', accent);
-      root.style.setProperty('--accent-hover', hover);
-      var rgb = hexToRgb(accent);
-      if (rgb) {
-        root.style.setProperty('--accent-dim', 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', 0.12)');
-        root.style.setProperty('--accent-glow', 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', 0.22)');
+    if (theme.accent && theme.hover) {
+      root.style.setProperty('--accent', theme.accent);
+      root.style.setProperty('--accent-hover', theme.hover);
+      var rgb = theme.rgb;
+      if (rgb && rgb.length === 3) {
+        var base = rgb[0] + ', ' + rgb[1] + ', ' + rgb[2];
+        root.style.setProperty('--accent-dim', 'rgba(' + base + ', 0.12)');
+        root.style.setProperty('--accent-glow', 'rgba(' + base + ', 0.22)');
       }
     }
 
@@ -132,12 +103,10 @@
 
   setupButtons();
 
-  var wasmReady = window._cwistWasmPromise || (window._cwistWasmPromise = (typeof CwistSearchModule === 'function')
-    ? CwistSearchModule().catch(function () { return null; })
-    : Promise.resolve(null));
-
-  wasmReady.then(function (mod) {
-    wasmMod = mod;
-    syncMenuAccent();
-  });
+  if (window.CwistBlog) {
+    window.CwistBlog.ready
+      .then(function (cwist) { return cwist.json('POST', '/theme', window.location.pathname); })
+      .then(syncMenuAccent)
+      .catch(function () {});
+  }
 }());

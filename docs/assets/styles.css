@@ -4,10 +4,12 @@
    Design Tokens
    ═══════════════════════════════════════════════════════════ */
 :root {
-  --bg:             #0f0e12;
-  --surface:        #17141d;
-  --surface-2:      #1f1a26;
-  --surface-3:      #2a2230;
+  --bg-base:        #0f0e12;
+  --surface-base:   #17141d;
+  --surface-2-base: #1f1a26;
+  --surface-3-base: #2a2230;
+  --tint-bg:        10%;
+  --tint-surface:   7%;
 
   --text:           #edf0f8;
   --text-muted:     #7d8799;
@@ -16,17 +18,18 @@
   --border:         rgba(255, 255, 255, 0.065);
   --border-strong:  rgba(255, 255, 255, 0.13);
 
-  --accent:         #c44b3b;
-  --accent-hover:   #d0624e;
-  --accent-dim:     rgba(196, 75, 59, 0.14);
-  --accent-glow:    rgba(196, 75, 59, 0.25);
-  --tone-red:       #b4574b;
-  --tone-yellow:    #b79a52;
-  --tone-blue:      #557da7;
-  --tone-black:     #141319;
-  --tone-white:     #ece7d8;
+  --accent:         #bf5f45;
+  --accent-hover:   #d27659;
+  --accent-dim:     rgba(191, 95, 69, 0.14);
+  --accent-glow:    rgba(191, 95, 69, 0.25);
+  /* Obangsaek as muted print inks: 주홍 · 황토 · 쪽빛 · 먹 · 소색 */
+  --tone-red:       #bf5f45;
+  --tone-yellow:    #a8925e;
+  --tone-blue:      #5470a0;
+  --tone-black:     #12151b;
+  --tone-white:     #e6e4df;
 
-  --header-bg:      rgba(9, 9, 15, 0.88);
+  --header-bg:      color-mix(in srgb, var(--bg) 88%, transparent);
   --header-shadow:  none;
 
   --font-sans:
@@ -53,36 +56,39 @@
   --content-w: 1040px;
 
   /* Semantic Article Colors (Dark) */
-  --prose-h2:        color-mix(in srgb, var(--tone-white) 75%, var(--tone-yellow));
-  --prose-h2-border: color-mix(in srgb, var(--tone-yellow) 45%, var(--border));
+  /* red = emphasis/links, blue = information, yellow = division only */
+  --prose-h2:        var(--text);
+  --prose-h2-border: color-mix(in srgb, var(--tone-yellow) 55%, var(--border));
   --prose-h4:        color-mix(in srgb, var(--tone-blue) 60%, var(--text-muted));
   --prose-bq:        color-mix(in srgb, var(--tone-white) 70%, var(--text-muted));
-  --prose-bq-bg:     linear-gradient(90deg, rgba(180,87,75,0.18), rgba(85,125,167,0.08));
+  --prose-bq-bg:     color-mix(in srgb, var(--tone-blue) 12%, transparent);
   --prose-hr:        color-mix(in srgb, var(--tone-yellow) 40%, var(--border-strong));
   --prose-th:        color-mix(in srgb, var(--tone-blue) 55%, var(--text-muted));
-  --prose-th-bg:     linear-gradient(180deg, color-mix(in srgb, var(--tone-yellow) 18%, var(--surface-2)), var(--surface-2));
+  --prose-th-bg:     color-mix(in srgb, var(--tone-blue) 14%, var(--surface-2));
   --prose-pre-bg:    linear-gradient(135deg, color-mix(in srgb, var(--tone-black) 75%, var(--surface)), var(--surface));
   --prose-pre-border:color-mix(in srgb, var(--tone-blue) 30%, var(--border));
-  --prose-code-bg:   var(--surface-2);
+  --prose-code-bg:   color-mix(in srgb, var(--tone-blue) 8%, var(--surface-2));
 
   /* Syntax Highlighting (Dark) */
   --hl-comment:  #7d8799;
-  --hl-keyword:  #c44b3b;
-  --hl-string:   #b79a52;
-  --hl-number:   #d0624e;
-  --hl-function: #557da7;
+  --hl-keyword:  var(--tone-red);
+  --hl-string:   var(--tone-yellow);
+  --hl-number:   var(--accent-hover);
+  --hl-function: var(--tone-blue);
   --hl-params:   #edf0f8;
-  --hl-tag:      #c44b3b;
-  --hl-attr:     #b79a52;
+  --hl-tag:      var(--tone-red);
+  --hl-attr:     var(--tone-yellow);
 
   color-scheme: dark;
 }
 
 :root[data-theme='light'] {
-  --bg:             #f8f6f2;
-  --surface:        #fffcf6;
-  --surface-2:      #f5eee3;
-  --surface-3:      #eee5d8;
+  --bg-base:        #f6f6f7;
+  --surface-base:   #fdfdfd;
+  --surface-2-base: #f0f0f2;
+  --surface-3-base: #e7e7ea;
+  --tint-bg:        8%;
+  --tint-surface:   5%;
 
   --text:           #1d2233;
   --text-muted:     #4f5c73;
@@ -91,17 +97,17 @@
   --border:         rgba(22, 37, 67, 0.10);
   --border-strong:  rgba(22, 37, 67, 0.18);
 
-  --accent:         #b94a3d;
-  --accent-hover:   #a33f35;
-  --accent-dim:     rgba(185, 74, 61, 0.14);
-  --accent-glow:    rgba(185, 74, 61, 0.24);
-  --tone-red:       #9f4a42;
-  --tone-yellow:    #9d8445;
-  --tone-blue:      #4b6f95;
-  --tone-black:     #2a2830;
-  --tone-white:     #f7f1df;
+  --accent:         #a84f38;
+  --accent-hover:   #8f4130;
+  --accent-dim:     rgba(168, 79, 56, 0.14);
+  --accent-glow:    rgba(168, 79, 56, 0.24);
+  --tone-red:       #a84f38;
+  --tone-yellow:    #8a7548;
+  --tone-blue:      #3e5a88;
+  --tone-black:     #23262d;
+  --tone-white:     #f1f0ec;
 
-  --header-bg:      rgba(247, 248, 252, 0.92);
+  --header-bg:      color-mix(in srgb, var(--bg) 92%, transparent);
   --header-shadow:  0 1px 0 rgba(22, 37, 67, 0.06);
 
   --shadow-sm: 0 1px 3px rgba(18, 32, 58, 0.10);
@@ -109,37 +115,39 @@
   --shadow-lg: 0 14px 44px rgba(18, 32, 58, 0.16);
 
   /* Semantic Article Colors (Light) */
-  --prose-h2:        var(--tone-yellow);
-  --prose-h2-border: var(--border-strong);
+  --prose-h2:        var(--text);
+  --prose-h2-border: color-mix(in srgb, var(--tone-yellow) 50%, var(--border-strong));
   --prose-h4:        var(--tone-blue);
   --prose-bq:        var(--text-muted);
-  --prose-bq-bg:     rgba(180, 87, 75, 0.06);
-  --prose-hr:        var(--border-strong);
+  --prose-bq-bg:     color-mix(in srgb, var(--tone-blue) 6%, transparent);
+  --prose-hr:        color-mix(in srgb, var(--tone-yellow) 45%, var(--border-strong));
   --prose-th:        var(--tone-blue);
-  --prose-th-bg:     var(--surface-2);
+  --prose-th-bg:     color-mix(in srgb, var(--tone-blue) 8%, var(--surface-2));
   --prose-pre-bg:    var(--surface-2);
   --prose-pre-border:var(--border-strong);
-  --prose-code-bg:   var(--surface-2);
+  --prose-code-bg:   color-mix(in srgb, var(--tone-blue) 5%, var(--surface-2));
 
   /* Syntax Highlighting (Light) */
   --hl-comment:  #7a8599;
-  --hl-keyword:  #b94a3d;
-  --hl-string:   #9d8445;
-  --hl-number:   #a33f35;
-  --hl-function: #4b6f95;
+  --hl-keyword:  var(--tone-red);
+  --hl-string:   var(--tone-yellow);
+  --hl-number:   var(--accent-hover);
+  --hl-function: var(--tone-blue);
   --hl-params:   #1d2233;
-  --hl-tag:      #b94a3d;
-  --hl-attr:     #9d8445;
+  --hl-tag:      var(--tone-red);
+  --hl-attr:     var(--tone-yellow);
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --bg:             #f8f6f2;
-    --surface:        #fffcf6;
-    --surface-2:      #f5eee3;
-    --surface-3:      #eee5d8;
+    --bg-base:        #f6f6f7;
+    --surface-base:   #fdfdfd;
+    --surface-2-base: #f0f0f2;
+    --surface-3-base: #e7e7ea;
+    --tint-bg:        8%;
+    --tint-surface:   5%;
 
     --text:           #1d2233;
     --text-muted:     #4f5c73;
@@ -148,12 +156,12 @@
     --border:         rgba(22, 37, 67, 0.10);
     --border-strong:  rgba(22, 37, 67, 0.18);
 
-    --accent:         #b94a3d;
-    --accent-hover:   #a33f35;
-    --accent-dim:     rgba(185, 74, 61, 0.14);
-    --accent-glow:    rgba(185, 74, 61, 0.24);
+    --accent:         #a84f38;
+    --accent-hover:   #8f4130;
+    --accent-dim:     rgba(168, 79, 56, 0.14);
+    --accent-glow:    rgba(168, 79, 56, 0.24);
 
-    --header-bg:      rgba(247, 248, 252, 0.92);
+    --header-bg:      color-mix(in srgb, var(--bg) 92%, transparent);
     --header-shadow:  0 1px 0 rgba(22, 37, 67, 0.06);
 
     --shadow-sm: 0 1px 3px rgba(18, 32, 58, 0.10);
@@ -161,30 +169,39 @@
     --shadow-lg: 0 14px 44px rgba(18, 32, 58, 0.16);
 
     /* Semantic Article Colors (Light) */
-    --prose-h2:        var(--tone-yellow);
-    --prose-h2-border: var(--border-strong);
+    --prose-h2:        var(--text);
+    --prose-h2-border: color-mix(in srgb, var(--tone-yellow) 50%, var(--border-strong));
     --prose-h4:        var(--tone-blue);
     --prose-bq:        var(--text-muted);
-    --prose-bq-bg:     rgba(180, 87, 75, 0.06);
-    --prose-hr:        var(--border-strong);
+    --prose-bq-bg:     color-mix(in srgb, var(--tone-blue) 6%, transparent);
+    --prose-hr:        color-mix(in srgb, var(--tone-yellow) 45%, var(--border-strong));
     --prose-th:        var(--tone-blue);
-    --prose-th-bg:     var(--surface-2);
+    --prose-th-bg:     color-mix(in srgb, var(--tone-blue) 8%, var(--surface-2));
     --prose-pre-bg:    var(--surface-2);
     --prose-pre-border:var(--border-strong);
-    --prose-code-bg:   var(--surface-2);
+    --prose-code-bg:   color-mix(in srgb, var(--tone-blue) 5%, var(--surface-2));
 
     /* Syntax Highlighting (Light) */
     --hl-comment:  #7a8599;
-    --hl-keyword:  #b94a3d;
-    --hl-string:   #9d8445;
-    --hl-number:   #a33f35;
-    --hl-function: #4b6f95;
+    --hl-keyword:  var(--tone-red);
+    --hl-string:   var(--tone-yellow);
+    --hl-number:   var(--accent-hover);
+    --hl-function: var(--tone-blue);
     --hl-params:   #1d2233;
-    --hl-tag:      #b94a3d;
-    --hl-attr:     #9d8445;
+    --hl-tag:      var(--tone-red);
+    --hl-attr:     var(--tone-yellow);
 
     color-scheme: light;
   }
+}
+
+/* Section tint: category/post pages set --section-tint to their accent
+   colour, which washes the page background and surfaces toward it. */
+:root {
+  --bg:        color-mix(in srgb, var(--section-tint, var(--bg-base)) var(--tint-bg), var(--bg-base));
+  --surface:   color-mix(in srgb, var(--section-tint, var(--surface-base)) var(--tint-surface), var(--surface-base));
+  --surface-2: color-mix(in srgb, var(--section-tint, var(--surface-2-base)) var(--tint-surface), var(--surface-2-base));
+  --surface-3: color-mix(in srgb, var(--section-tint, var(--surface-3-base)) var(--tint-surface), var(--surface-3-base));
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -205,6 +222,10 @@ body {
   line-height: 1.75;
   background: var(--bg);
   color: var(--text);
+  /* Hangul: break between words (eojeol), not inside them */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-break: strict;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -915,12 +936,23 @@ ul, ol { list-style: none; }
   background: var(--surface-2);
 }
 
+/* Even out ragged Hangul lines and avoid one-syllable widows */
+.article-body p,
+.article-body li,
+.article-body blockquote { text-wrap: pretty; }
+
+.article-title,
+.page-title,
+.hero-title,
+.article-body h2,
+.article-body h3 { text-wrap: balance; }
+
 /* ── Links ── */
 .article-body a {
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: rgba(255, 107, 43, 0.35);
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
   transition: text-decoration-color 0.15s;
 }
 
@@ -1444,8 +1476,8 @@ ul, ol { list-style: none; }
 
 body {
   background-image:
-    linear-gradient(135deg, rgba(196, 75, 59, 0.08) 0%, transparent 35%),
-    linear-gradient(315deg, rgba(116, 54, 185, 0.08) 0%, transparent 45%);
+    linear-gradient(135deg, color-mix(in srgb, var(--tone-red) 8%, transparent) 0%, transparent 35%),
+    linear-gradient(315deg, color-mix(in srgb, var(--tone-blue) 8%, transparent) 0%, transparent 45%);
 }
 
 h1, h2, h3, .article-title, .hero-title {

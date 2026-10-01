@@ -6,3 +6,7 @@ bin/
 
 # Local test build output
 *-testing-build/
+
+# CWIST WASI 0.2 component build (generated)
+blog/.build/
+blog/node_modules/

@@ -34,20 +34,34 @@
   if (submitBtn) submitBtn.textContent = i18n.submitLabel;
   if (countEl)   countEl.textContent   = i18n.loading;
 
-  var wasmReady = window._cwistWasmPromise || (window._cwistWasmPromise = (typeof CwistSearchModule === 'function')
-    ? CwistSearchModule().catch(function () { return null; })
-    : Promise.resolve(null));
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
 
-  Promise.all([
-    wasmReady,
-    fetch('/data/comments.json?v=' + Date.now(), { cache: 'no-store' }).then(function(r) {
+  function renderFallback(list) {
+    return list.map(function (c) {
+      var date = c.created_at ? c.created_at.slice(0, 10) : '';
+      return '<div class="comment"><div class="comment-meta"><span class="comment-author">' +
+        escapeHtml(c.author || 'Anonymous') + '</span><span class="comment-date">' +
+        escapeHtml(date) + '</span></div><div class="comment-body"><p>' +
+        escapeHtml(c.body) + '</p></div></div>';
+    }).join('');
+  }
+
+  var cwistReady = window.CwistBlog
+    ? window.CwistBlog.ready
+    : Promise.reject(new Error('cwist-runtime.js not loaded'));
+
+  fetch('/data/comments.json?v=' + Date.now(), { cache: 'no-store' })
+    .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     })
-  ])
-    .then(function (results) {
-      var mod = results[0];
-      var data = results[1];
+    .then(function (data) {
       var list = Array.isArray(data[slug]) ? data[slug] : [];
       if (countEl) {
         countEl.textContent = list.length ? i18n.count(list.length) : '';
@@ -61,26 +75,19 @@
         listEl.appendChild(emptyEl);
         return;
       }
-      
-      var htmlStrings = [];
-      list.forEach(function (c) {
-        var author = c.author || 'Anonymous';
-        var date = c.created_at ? c.created_at.slice(0, 10) : '';
-        var bodyMd = c.body || '';
 
-        if (mod && typeof mod.ccall === 'function') {
-          var ptr = mod.ccall('cwist_render_comment', 'number', ['string', 'string', 'string'], [author, date, bodyMd]);
-          if (ptr) {
-            htmlStrings.push(mod.UTF8ToString(ptr));
-            mod.ccall('cwist_free_html', null, ['number'], [ptr]);
-          } else {
-            htmlStrings.push('<div class="comment"><b>' + author + '</b> ' + date + '<div>' + bodyMd + '</div></div>');
-          }
-        } else {
-          htmlStrings.push('<div class="comment"><b>' + author + '</b> ' + date + '<div>' + bodyMd + '</div></div>');
-        }
-      });
-      listEl.innerHTML = htmlStrings.join('');
+      // Comment markdown is rendered (raw HTML disabled) by the CWIST component.
+      return cwistReady
+        .then(function (cwist) {
+          return cwist.text('POST', '/render/comments', JSON.stringify(list));
+        })
+        .catch(function (err) {
+          console.warn('[comments] CWIST component render failed, using fallback', err);
+          return renderFallback(list);
+        })
+        .then(function (html) {
+          listEl.innerHTML = html;
+        });
     })
     .catch(function (err) {
       console.error('[comments] load error', err);

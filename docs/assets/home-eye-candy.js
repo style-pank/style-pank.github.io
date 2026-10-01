@@ -20,21 +20,38 @@
 
   var palette = collectChips();
 
-  function renderHomeOverview() {
-    mount.innerHTML = [
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function renderFallback() {
+    return [
       '<section class="han-eye">',
       '  <div class="han-eye-header">',
-      '    <h2 class="han-eye-title">' + title + '</h2>',
-      '    <p class="han-eye-desc">' + desc + '</p>',
+      '    <h2 class="han-eye-title">' + escapeHtml(title) + '</h2>',
+      '    <p class="han-eye-desc">' + escapeHtml(desc) + '</p>',
       '  </div>',
       '  <div class="han-palette">',
       palette.split(',').map(function (item) {
-        return '<span class="han-chip">' + item + '</span>';
+        return '<span class="han-chip">' + escapeHtml(item) + '</span>';
       }).join(''),
       '  </div>',
       '</section>'
     ].join('');
   }
 
-  renderHomeOverview();
+  // Paint the plain version immediately, then swap in the component render.
+  mount.innerHTML = renderFallback();
+  if (window.CwistBlog) {
+    window.CwistBlog.ready
+      .then(function (cwist) {
+        return cwist.text('POST', '/render/home',
+          JSON.stringify({ title: title, description: desc, chips: palette }));
+      })
+      .then(function (html) { mount.innerHTML = html; })
+      .catch(function () {});
+  }
 }());

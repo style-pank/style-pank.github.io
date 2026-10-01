@@ -1,109 +1,84 @@
 # Style and Grace
 
-Style and Grace is a GitHub Pages blog/site that uses a **client-side JavaScript rendering pipeline** as the canonical way to render post content.
+Style and Grace is a GitHub Pages blog whose post bodies, search, comments, and
+relations graph are rendered in the browser by a **CWIST WASI 0.2 component**.
 
-Post markdown source is delivered to the browser and rendered at runtime by `assets/post-renderer.js`.
-
----
-
-## Why client-side rendering
-
-This project keeps markdown rendering logic in one place: the browser renderer.
-
-- One front-matter parsing behavior in one script
-- No section-specific markdown rendering logic
-- No raw-markdown fallback injection into the article body
-
-This reduces drift between categories and avoids split behavior where some pages render markdown differently.
+The render kernel (`blog/wasm`) is a CWIST app built for `wasm32-wasip2` that
+exports CWIST's `cwist-guest` WIT world (`lib/cwist/wit/cwist.wit`). Page
+scripts ask it for renders the way a client talks to a CWIST server: one
+serialized HTTP/1.1 request per call.
 
 ---
 
-## Architecture overview
+## Architecture
 
-### Canonical post rendering path
+### Build pipeline (`make wasm-blog`)
 
-1. Static page shell is generated with post metadata (title/date/tags/etc).
-2. Raw post markdown is embedded in a JSON script payload (`#post-markdown`).
-3. `assets/post-renderer.js` parses and renders the markdown payload.
-4. JS writes rendered HTML into `#article-body`.
+1. **wasi-sdk clang** links `blog/wasm/*.c` + md4c against `libcwist_wasip2` as a reactor core module
+2. **wit-bindgen** generates the canonical-ABI bindings for the `cwist-guest` world
+3. **wasm-tools component embed** produces the WASI 0.2 component (`blog.component.wasm`)
+4. **jco transpile** (`--no-nodejs-compat --tla-compat`) emits a browser ES module plus core wasm shards
+5. **esbuild** bundles the jco output, the cwist-wasm component adapter, and the
+   preview2-shim browser build into `assets/cwist-blog.mjs`
 
-### Secondary tooling
+### Runtime path
 
-The C static generator (`tools/generate_static.c`, `bin/bloggen`) is used to build page shells, indexes, navigation, and assets in `docs/`.
+1. `assets/cwist-runtime.js`, in every page's `<head>`, publishes `window.CwistBlog.ready`
+   and loads `cwist-blog.mjs` as a module.
+2. Page scripts call CWIST routes inside the component through the client `ready` resolves to.
 
----
+| Route | Request body | Response | Used by |
+|---|---|---|---|
+| `POST /render/markdown` | markdown | HTML | `post-renderer.js` |
+| `POST /render/comments` | JSON array of comments | HTML (raw HTML disabled) | `comments.js` |
+| `POST /render/home` | `{title,description,chips}` | HTML | `home-eye-candy.js` |
+| `PUT /search/index` | `search-index.json` | 204 | `search-ui.js` |
+| `POST /search` | query | result-card HTML | `search-ui.js` |
+| `POST /relations` | `search-index.json` | `{edges:[{a,b,w}]}` | `relations-ui.js` |
+| `POST /theme` | `location.pathname` | section accent JSON | `theme-toggle.js` |
 
-## Rendering pipeline details
-
-- **Input:** full markdown source (possibly with front matter)
-- **Front matter split:** performed in `assets/post-renderer.js`
-- **Markdown render:** JS renderer in the browser
-- **Output:** HTML string injected into article body
-
-Guarantees:
-
-- front matter does not appear in rendered post body
-- article body receives rendered HTML output, not raw markdown text
+If the component cannot load (`ready` rejects), each script falls back to a plain-JS render.
 
 ---
 
 ## Directory / component guide
 
-- `assets/post-renderer.js`  
-  Browser renderer for front matter split and markdown-to-HTML conversion.
-
-- `tools/generate_static.c`  
-  Static page shell/index generator (home/category/post/search scaffolding).
-
-- `assets/search-ui.js`, `blog/wasm/search.c`  
-  Search runtime and search WASM scoring module.
-
-- `posts/<category>/*.md`  
-  Post source markdown files (with optional YAML front matter).
-
-- `docs/`  
-  Generated publishable site output for GitHub Pages workflows.
+- `blog/wasm/blog_guest.c` — CWIST app routes and the `cwist-guest` exports
+- `blog/wasm/*.c` — markdown / comment / search / relations / theme kernels
+- `blog/js/cwist-blog-entry.js` — browser bundle entry
+- `blog/package.json` — pins jco, preview2-shim, esbuild
+- `assets/cwist-runtime.js` — component loader
+- `tools/generate_static.c` — page shell / index / navigation generator (native C)
+- `posts/<category>/*.md` — post sources
+- `docs/` — generated GitHub Pages output
 
 ---
 
 ## Development and build notes
 
-Initialize submodules first:
+Initialize only the submodules the build needs:
 
 ```bash
-git submodule update --init --recursive
+git submodule update --init lib/md4c lib/cwist
+git -C lib/cwist submodule update --init --depth 1 lib/cjson lib/libttak lib/boringssl
 ```
 
-Build static site shell/output:
+Toolchain (same pins as `lib/cwist` CI): wasi-sdk 25, wasm-tools 1.259, wit-bindgen 0.62, Node 22.
 
 ```bash
-make clean static-site
+make wasm-blog WASI_SDK=$HOME/toolchains/wasi-sdk-25.0-x86_64-linux   # component + bundle
+make clean static-site                                                # generate docs/
+# or both: make site WASI_SDK=...
 ```
 
-Build search WASM module (requires Emscripten):
-
-```bash
-make wasm-search
-```
-
-Typical local flow:
-
-1. Edit posts / styles / generator / renderer
-2. Rebuild search WASM module when search logic changes
-3. Run `make clean static-site`
-4. Validate generated `docs/post/**/index.html` includes:
-   - empty `#article-body`
-   - `#post-markdown` JSON payload
-   - post renderer script
+Point `WASM_TOOLS=` / `WIT_BINDGEN=` at the binaries if they are not on PATH.
 
 ---
 
 ## Current status and known limitations
 
-- Canonical post rendering is client-side JavaScript for post pages.
-- Search remains a separate WASM path and index pipeline.
-- Category listing pages still use pre-rendered HTML snippets for list content.
-- Building WASM modules requires a local Emscripten toolchain.
-- The static generator currently stores full post source in memory while building.
+- The `cwist-guest` world has a single synchronous `dispatch`, so jco-lowered export calls run on the main thread.
+- Category listing pages still use pre-rendered HTML snippets.
+- The static generator keeps full post sources in memory while building.
 
 If you are looking for the Korean documentation, see `README.ko.md`.

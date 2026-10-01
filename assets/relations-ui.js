@@ -9,7 +9,6 @@
   var posts = [];
   var nodes = [];
   var edges = [];
-  var wasmMod = null;
   var rafId = null;
   var hoveredNode = -1;
   var pointer = { x: 0, y: 0, active: false };
@@ -41,37 +40,19 @@
     };
   }
 
-  function wasmScore(query, tagsStr) {
-    if (!query || !tagsStr) return 0;
-    if (wasmMod && typeof wasmMod.ccall === 'function') {
-      return wasmMod.ccall(
-        'cwist_score',
-        'number',
-        ['string', 'string', 'string', 'string', 'string'],
-        [query, '', tagsStr, '', '']
-      ) || 0;
+  // JS stand-in for the component's tag affinity when it cannot load.
+  function fallbackEdges() {
+    var out = [];
+    for (var a = 0; a < posts.length; a++) {
+      for (var b = a + 1; b < posts.length; b++) {
+        var common = 0;
+        for (var i = 0; i < posts[a].tags.length; i++) {
+          if (posts[b].tags.indexOf(posts[a].tags[i]) !== -1) common += 1;
+        }
+        if (common > 0) out.push({ a: a, b: b, w: common * 2.2 });
+      }
     }
-    return tagsStr.indexOf(query) !== -1 ? 2 : 0;
-  }
-
-  function pairScore(a, b) {
-    if (!a.tags.length || !b.tags.length) return 0;
-    if (wasmMod && typeof wasmMod.ccall === 'function') {
-      return wasmMod.ccall(
-        'cwist_pair_score',
-        'number',
-        ['string', 'string'],
-        [a.tagsStr, b.tagsStr]
-      ) || 0;
-    }
-
-    var score = 0;
-    var common = 0;
-    for (var i = 0; i < a.tags.length; i++) {
-      if (b.tags.indexOf(a.tags[i]) !== -1) common += 1;
-    }
-    score += common * 2.2;
-    return score;
+    return out;
   }
 
   function isLightTheme() {
@@ -105,7 +86,7 @@
     };
   }
 
-  function buildMesh() {
+  function buildMesh(pairEdges) {
     var stage = stageSize();
     var cx = stage.width / 2;
     var cy = stage.height / 2;
@@ -129,15 +110,12 @@
     }
 
     edges = [];
-    for (var a = 0; a < posts.length; a++) {
-      for (var b = a + 1; b < posts.length; b++) {
-        var weight = pairScore(posts[a], posts[b]);
-        if (weight <= 0) continue;
-        edges.push({ a: a, b: b, w: Math.min(10, weight) });
-        posts[a].degree += 1;
-        posts[b].degree += 1;
-      }
-    }
+    pairEdges.forEach(function (e) {
+      if (!posts[e.a] || !posts[e.b] || e.w <= 0) return;
+      edges.push({ a: e.a, b: e.b, w: Math.min(10, e.w) });
+      posts[e.a].degree += 1;
+      posts[e.b].degree += 1;
+    });
 
     edges.sort(function (a, b) { return b.w - a.w; });
     edges = edges.slice(0, Math.min(140, Math.max(posts.length * 4, 24)));
@@ -203,7 +181,7 @@
       moveNode(n, width, height);
       var active = idx === hoveredNode;
       var size = active ? 8 : 6;
-      ctx.fillStyle = active ? '#eeb358' : '#c44b3b';
+      ctx.fillStyle = active ? '#a8925e' : '#bf5f45';
       ctx.strokeStyle = 'rgba(255,255,255,0.4)';
       ctx.lineWidth = active ? 1.4 : 1;
 
@@ -224,22 +202,29 @@
   function init() {
     resize();
 
-    var wasmReady = (typeof CwistSearchModule === 'function')
-      ? CwistSearchModule().catch(function () { return null; })
-      : Promise.resolve(null);
+    var cwistReady = window.CwistBlog
+      ? window.CwistBlog.ready
+      : Promise.reject(new Error('cwist-runtime.js not loaded'));
 
-    wasmReady
-      .then(function (mod) {
-        wasmMod = mod;
-        return fetch('../search-index.json?v=' + Date.now(), { cache: 'no-store' });
-      })
+    fetch('../search-index.json?v=' + Date.now(), { cache: 'no-store' })
       .then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
+        return r.text();
       })
-      .then(function (data) {
+      .then(function (text) {
+        var data = JSON.parse(text);
         posts = (Array.isArray(data) ? data : []).map(normalizePost);
-        buildMesh();
+        // Every post pair is scored inside the CWIST component in one call.
+        return cwistReady
+          .then(function (cwist) { return cwist.json('POST', '/relations', text); })
+          .then(function (res) { return res && Array.isArray(res.edges) ? res.edges : []; })
+          .catch(function (err) {
+            console.warn('[relations-ui] CWIST component unavailable, using fallback', err);
+            return fallbackEdges();
+          });
+      })
+      .then(function (pairEdges) {
+        buildMesh(pairEdges);
         step();
       })
       .catch(function (err) {

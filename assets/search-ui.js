@@ -7,29 +7,33 @@
 
   if (!inputEl || !resultsEl) return;
 
-  var rawIndexString = null;
-  var wasmMod = null;
+  var cwist = null;
+  var indexLoaded = false;
   var cursor  = -1;
   var renderTimer = null;
+  var renderSeq = 0;
   var DEBOUNCE_MS = 120;
 
+  // The index is pushed into the CWIST component once (PUT /search/index);
+  // each query is then a POST /search that returns rendered result cards.
   function init() {
-    var wasmReady =
-      (typeof CwistSearchModule === 'function')
-        ? CwistSearchModule().catch(function () { return null; })
-        : Promise.resolve(null);
+    var ready = window.CwistBlog
+      ? window.CwistBlog.ready
+      : Promise.reject(new Error('cwist-runtime.js not loaded'));
 
-    wasmReady
-      .then(function (m) {
-        wasmMod = m;
-        return fetch('../search-index.json?v=' + Date.now(), { cache: 'no-store' });
-      })
-      .then(function (r) {
+    Promise.all([
+      ready,
+      fetch('../search-index.json?v=' + Date.now(), { cache: 'no-store' }).then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.text();
       })
-      .then(function (text) {
-        rawIndexString = text;
+    ])
+      .then(function (results) {
+        cwist = results[0];
+        return cwist.text('PUT', '/search/index', results[1]);
+      })
+      .then(function () {
+        indexLoaded = true;
         inputEl.disabled = false;
         inputEl.focus();
         render(inputEl.value);
@@ -40,26 +44,30 @@
       });
   }
 
+  function showResults(html) {
+    resultsEl.innerHTML = html;
+    if (noResultEl) noResultEl.hidden = html !== '';
+    cursor = -1;
+  }
+
   function render(query) {
     var q = (query || '').trim();
-    if (!q || !rawIndexString || !wasmMod) {
+    var seq = ++renderSeq;
+    if (!q || !indexLoaded) {
       resultsEl.innerHTML = '';
       if (noResultEl) noResultEl.hidden = true;
       cursor = -1;
       return;
     }
 
-    var htmlPtr = wasmMod.ccall('cwist_search_and_render', 'number', ['string', 'string'], [rawIndexString, q]);
-    if (htmlPtr) {
-      var html = wasmMod.UTF8ToString(htmlPtr);
-      resultsEl.innerHTML = html;
-      wasmMod.ccall('cwist_free_html', null, ['number'], [htmlPtr]);
-      if (noResultEl) noResultEl.hidden = html !== '';
-    } else {
-      resultsEl.innerHTML = '';
-      if (noResultEl) noResultEl.hidden = false;
-    }
-    cursor = -1;
+    cwist.text('POST', '/search', q)
+      .then(function (html) {
+        if (seq === renderSeq) showResults(html);
+      })
+      .catch(function (e) {
+        console.error('[cwist-search] query error:', e);
+        if (seq === renderSeq) showResults('');
+      });
   }
 
   function requestRender() {

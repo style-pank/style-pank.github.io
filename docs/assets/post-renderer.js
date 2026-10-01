@@ -174,79 +174,81 @@
     return html.join('\n');
   }
 
-  function renderPost() {
-    var wasmReady = window._cwistWasmPromise || (window._cwistWasmPromise = (typeof CwistSearchModule === 'function')
-      ? CwistSearchModule().catch(function () { return null; })
-      : Promise.resolve(null));
+  function assetsPrefix() {
+    var linkEl = document.querySelector('link[href*="assets/styles.css"]');
+    if (!linkEl) return '';
+    var href = linkEl.getAttribute('href');
+    var idx = href.indexOf('assets/');
+    return idx !== -1 ? href.substring(0, idx) : '';
+  }
 
-    wasmReady.then(function (mod) {
-      var markdown = getMarkdownText(markdownEl);
-      var source = stripFrontMatter(markdown).trim();
-      if (!source) {
-        bodyEl.innerHTML = '<p>이 게시물 본문이 비어 있습니다.</p>';
-        return;
-      }
-
-      var assetsPrefix = '';
-      var linkEl = document.querySelector('link[href*="assets/styles.css"]');
-      if (linkEl) {
-        var href = linkEl.getAttribute('href');
-        var idx = href.indexOf('assets/');
-        if (idx !== -1) assetsPrefix = href.substring(0, idx);
-      }
-
-      function fixPaths(html) {
-        var result = html;
-        if (assetsPrefix) {
-          // Replace absolute /assets/ paths with relative paths (handles both " and ')
-          result = result.replace(/(src|href)=["']\/assets\//g, function(match, p1) {
-            return p1 + '="' + assetsPrefix + 'assets/';
-          });
-        }
-        return result;
-      }
-
-      function processLinks() {
-        var links = bodyEl.querySelectorAll('a');
-        links.forEach(function(link) {
-          var href = link.getAttribute('href');
-          if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-            var host = window.location.hostname;
-            try {
-              var url = new URL(href);
-              if (url.hostname !== host) {
-                link.setAttribute('target', '_blank');
-                link.setAttribute('rel', 'noopener noreferrer');
-              }
-            } catch (e) {}
-          }
-        });
-      }
-
-      if (mod && typeof mod.ccall === 'function') {
-        var htmlPtr = mod.ccall('cwist_render_markdown', 'number', ['string'], [source]);
-        if (htmlPtr) {
-          var rawHtml = mod.UTF8ToString(htmlPtr);
-          bodyEl.innerHTML = fixPaths(rawHtml);
-          mod.ccall('cwist_free_html', null, ['number'], [htmlPtr]);
-          processLinks();
-          if (window.hljs) hljs.highlightAll();
-          return;
-        }
-      }
-      console.warn('[post-renderer] wasm markdown render failed, using js fallback');
-      bodyEl.innerHTML = renderMarkdownLite(source);
-    }).finally(function () {
-      if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
-        window.MathJax.typesetPromise([bodyEl]).catch(function () {});
-      }
-      if (window.hljs && typeof window.hljs.highlightAll === 'function') {
-        window.hljs.highlightAll();
-      }
-      bodyEl.innerHTML = fixPaths(renderMarkdownLite(source));
-      processLinks();
-      if (window.hljs) hljs.highlightAll();
+  function fixPaths(html, prefix) {
+    if (!prefix) return html;
+    // Replace absolute /assets/ paths with relative paths (handles both " and ')
+    return html.replace(/(src|href)=["']\/assets\//g, function (match, attr) {
+      return attr + '="' + prefix + 'assets/';
     });
+  }
+
+  // md4c emits LaTeX spans as <x-equation>; hand them to MathJax as TeX.
+  function equationsToTex(root) {
+    var eqs = root.querySelectorAll('x-equation');
+    for (var i = 0; i < eqs.length; i++) {
+      var eq = eqs[i];
+      var display = eq.getAttribute('type') === 'display';
+      var tex = eq.textContent || '';
+      eq.replaceWith(document.createTextNode(display ? '\\[' + tex + '\\]' : '\\(' + tex + '\\)'));
+    }
+  }
+
+  function processLinks() {
+    var links = bodyEl.querySelectorAll('a');
+    links.forEach(function (link) {
+      var href = link.getAttribute('href');
+      if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+        try {
+          var url = new URL(href);
+          if (url.hostname !== window.location.hostname) {
+            link.setAttribute('target', '_blank');
+            link.setAttribute('rel', 'noopener noreferrer');
+          }
+        } catch (e) {}
+      }
+    });
+  }
+
+  function cwistReady() {
+    return window.CwistBlog
+      ? window.CwistBlog.ready
+      : Promise.reject(new Error('cwist-runtime.js not loaded'));
+  }
+
+  function renderPost() {
+    var source = stripFrontMatter(getMarkdownText(markdownEl)).trim();
+    if (!source) {
+      bodyEl.innerHTML = '<p>이 게시물 본문이 비어 있습니다.</p>';
+      return;
+    }
+
+    cwistReady()
+      .then(function (cwist) {
+        return cwist.text('POST', '/render/markdown', source);
+      })
+      .catch(function (err) {
+        console.warn('[post-renderer] CWIST component render failed, using js fallback', err);
+        return renderMarkdownLite(source);
+      })
+      .then(function (html) {
+        bodyEl.innerHTML = fixPaths(html, assetsPrefix());
+        equationsToTex(bodyEl);
+        processLinks();
+        if (window.hljs && typeof window.hljs.highlightAll === 'function') {
+          window.hljs.highlightAll();
+        }
+        if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+          window.MathJax.typesetPromise([bodyEl]).catch(function () {});
+        }
+      });
   }
 
   renderPost();
