@@ -3,16 +3,15 @@
  * exported through the cwist-guest world (lib/cwist/wit/cwist.wit).
  *
  * The browser talks to it the same way a client talks to a CWIST server:
- * serialized HTTP/1.1 requests in, serialized responses out, through the
- * jco-transpiled component and the cwist-wasm adapter (assets/cwist-blog.js).
+ * serialized HTTP/1.1 requests in, serialized responses out. The requests
+ * are built and parsed in C by the Emscripten page host (blog/ui), which
+ * hands the bytes to the jco-transpiled component's dispatch export.
  *
- *   POST /render/markdown   body: markdown            -> text/html
- *   POST /render/comments   body: [{author,created_at,body}] -> text/html
- *   POST /render/home       body: {title,description,chips}  -> text/html
  *   PUT  /search/index      body: search-index.json   -> 204
  *   POST /search            body: query               -> text/html
- *   POST /relations         body: search-index.json   -> application/json
- *   POST /theme             body: location.pathname   -> application/json
+ *
+ * Everything else (post bodies, comments, home card, relations, accents) is
+ * rendered at build time by tools/generate_static.c with the same kernels.
  *
  * Generated bindings (cwist_guest.h / cwist_guest.c) come from wit-bindgen
  * at build time and are never committed.
@@ -21,7 +20,6 @@
 #include <cwist/wasm/wasm_component.h>
 #include <cwist/core/mem/alloc.h>
 #include <cJSON.h>
-#include <string.h>
 
 #include "blog.h"
 #include "cwist_guest.h"
@@ -56,55 +54,6 @@ static void bad_request(cwist_http_response *res, const char *why) {
     cwist_http_header_add(&res->headers, "Content-Type", "text/plain; charset=utf-8");
 }
 
-static const char *json_str(const cJSON *obj, const char *key) {
-    const cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
-    return cJSON_IsString(v) && v->valuestring ? v->valuestring : "";
-}
-
-static void render_markdown_handler(cwist_http_request *req, cwist_http_response *res) {
-    size_t len = 0;
-    const char *md = body_of(req, &len);
-    reply(res, blog_render_markdown(md, len, true), "text/html; charset=utf-8");
-}
-
-static void render_comments_handler(cwist_http_request *req, cwist_http_response *res) {
-    cJSON *list = cJSON_Parse(body_of(req, NULL));
-    if (!cJSON_IsArray(list)) {
-        cJSON_Delete(list);
-        bad_request(res, "expected a JSON array of comments");
-        return;
-    }
-
-    cwist_sstring *out = cwist_sstring_create();
-    cwist_sstring_assign(out, "");
-    const cJSON *c;
-    cJSON_ArrayForEach(c, list) {
-        char date[11] = {0};
-        strncpy(date, json_str(c, "created_at"), 10);
-        char *html = blog_render_comment(json_str(c, "author"), date, json_str(c, "body"));
-        if (html) {
-            cwist_sstring_append(out, html);
-            cwist_free(html);
-        }
-    }
-    cJSON_Delete(list);
-    reply(res, cwist_strdup(out->data ? out->data : ""), "text/html; charset=utf-8");
-    cwist_sstring_destroy(out);
-}
-
-static void render_home_handler(cwist_http_request *req, cwist_http_response *res) {
-    cJSON *in = cJSON_Parse(body_of(req, NULL));
-    if (!cJSON_IsObject(in)) {
-        cJSON_Delete(in);
-        bad_request(res, "expected {title, description, chips}");
-        return;
-    }
-    reply(res, blog_render_home(json_str(in, "title"), json_str(in, "description"),
-                                json_str(in, "chips")),
-          "text/html; charset=utf-8");
-    cJSON_Delete(in);
-}
-
 static void search_index_handler(cwist_http_request *req, cwist_http_response *res) {
     cJSON *index = cJSON_Parse(body_of(req, NULL));
     if (!cJSON_IsArray(index)) {
@@ -127,32 +76,12 @@ static void search_handler(cwist_http_request *req, cwist_http_response *res) {
           "text/html; charset=utf-8");
 }
 
-static void relations_handler(cwist_http_request *req, cwist_http_response *res) {
-    cJSON *index = cJSON_Parse(body_of(req, NULL));
-    if (!cJSON_IsArray(index)) {
-        cJSON_Delete(index);
-        bad_request(res, "expected the search-index.json array");
-        return;
-    }
-    reply(res, blog_relations_json(index), "application/json");
-    cJSON_Delete(index);
-}
-
-static void theme_handler(cwist_http_request *req, cwist_http_response *res) {
-    reply(res, blog_theme_json(body_of(req, NULL)), "application/json");
-}
-
 static cwist_app *app(void) {
     if (g_app) return g_app;
     g_app = cwist_app_create();
     if (!g_app) return NULL;
-    cwist_app_post(g_app, "/render/markdown", render_markdown_handler);
-    cwist_app_post(g_app, "/render/comments", render_comments_handler);
-    cwist_app_post(g_app, "/render/home", render_home_handler);
     cwist_app_put(g_app, "/search/index", search_index_handler);
     cwist_app_post(g_app, "/search", search_handler);
-    cwist_app_post(g_app, "/relations", relations_handler);
-    cwist_app_post(g_app, "/theme", theme_handler);
     return g_app;
 }
 

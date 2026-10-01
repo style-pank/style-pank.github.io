@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>검색 – Style and Grace</title>
 <link rel="stylesheet" href="../assets/styles.css">
-<script src="../assets/cwist-runtime.js"></script>
+<script src="../assets/blog-ui.js"></script>
+<style>:root{--accent:#7a5cff;--accent-hover:#9a84ff;--section-tint:#7a5cff;--accent-dim:rgba(122, 92, 255, 0.12);--accent-glow:rgba(122, 92, 255, 0.22);}</style>
 </head>
 <body>
 <div class="site-wrap">
@@ -18,7 +19,7 @@
 <li><a href="../category/korean/">Korean</a></li>
 <li><a href="../category/russian/">Russian</a></li>
 <li><a href="../category/english/">English</a></li>
-<li><a href="../search/">검색</a></li>
+<li><a class="active" href="../search/">검색</a></li>
 <li><a href="../relations/">Relations</a></li>
 </ul>
 <div class="nav-actions"><button class="theme-toggle" type="button" data-theme-toggle aria-label="Light mode" title="Light mode">☀️ Light</button></div>
@@ -33,14 +34,11 @@
 <p id="search-no-result" class="search-no-result" hidden>결과 없음</p>
 <div id="search-results" class="search-results" role="listbox" aria-live="polite"></div>
 </div>
-<script src="../assets/search-ui.js"></script>
 
 </main>
 <footer class="site-footer">
 <p>GitHub Pages</p>
 </footer>
-<script src="../assets/theme-toggle.js"></script>
-<script src="../assets/home-layout-fallback.js"></script>
 </div>
 </body>
 </html>

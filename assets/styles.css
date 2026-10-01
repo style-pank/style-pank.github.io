@@ -1534,13 +1534,47 @@ h1, h2, h3, .article-title, .hero-title {
   padding: 0.5rem;
 }
 
-.relations-canvas {
+.relations-svg {
   width: 100%;
   height: 68vh;
   min-height: 420px;
   display: block;
   background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 24px 24px;
+}
+
+/* Edges are highlighted by per-node :has() rules emitted with the SVG. */
+.rel-edge {
+  fill: none;
+  stroke: rgba(196, 75, 59, 0.34);
+  stroke-width: var(--w);
+  transition: stroke 0.15s ease;
+}
+
+.rel-node rect {
+  fill: #bf5f45;
+  stroke: rgba(255, 255, 255, 0.4);
+  stroke-width: 1;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease, fill 0.15s ease;
+}
+
+.rel-node text {
+  fill: var(--text);
+  fill-opacity: 0.9;
+  font: 12px NixgonFont, sans-serif;
+}
+
+.rel-node:hover rect,
+.rel-node:focus-visible rect {
+  fill: #a8925e;
+  stroke-width: 1.4;
+  transform: rotate(67.5deg) scale(1.333);
+}
+
+.rel-node:hover text,
+.rel-node:focus-visible text {
+  font-weight: 700;
 }
 
 .article-wrap,

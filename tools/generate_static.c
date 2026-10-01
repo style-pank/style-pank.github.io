@@ -1,4 +1,6 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <dirent.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -11,15 +13,25 @@
 #include <sys/types.h>
 #include <ctype.h>
 #include <pthread.h>
+#include <math.h>
 
 #include <cwist/core/sstring/sstring.h>
+#include <cwist/core/mem/alloc.h>
+#include <cJSON.h>
 #include <md4c-html.h>
 
+#include "blog.h"
 #include "scheduler.h"
 
 #define PATH_MAX_LEN    4096
 #define MAX_EXCERPT_LEN 200
 #define ACCENT_COLOR_BUFFER_SIZE 24
+#define SITE_HOST       "style-pank.github.io"
+#define COMMENT_REPO    "style-pank/style-pank.github.io"
+
+/* Accent of the search page (no categories.cfg section of its own). */
+#define SEARCH_ACCENT_PRIMARY   "#7a5cff"
+#define SEARCH_ACCENT_SECONDARY "#9a84ff"
 
 /* ── Data model ─────────────────────────────────────────────────────────── */
 
@@ -638,7 +650,10 @@ static void render_nav(blog_catalog_t *catalog, const char *active_category,
         cwist_sstring_append(out, "</a></li>\n");
     }
     /* search link */
-    cwist_sstring_append(out, "<li><a href=\"");
+    cwist_sstring_append(out, "<li><a");
+    if (active_category && strcmp(active_category, "search") == 0)
+        cwist_sstring_append(out, " class=\"active\"");
+    cwist_sstring_append(out, " href=\"");
     cwist_sstring_append(out, root_prefix);
     cwist_sstring_append(out,
         "search/\">"
@@ -661,8 +676,26 @@ static void render_nav(blog_catalog_t *catalog, const char *active_category,
 }
 
 /*
+ * render_accent_style — section accent as CSS variables, including the
+ * translucent --accent-dim / --accent-glow derived from a #rrggbb primary.
+ */
+static void render_accent_style(const char *primary, const char *secondary,
+                                cwist_sstring *out) {
+    ss_fmt(out, "<style>:root{--accent:%s;--accent-hover:%s;--section-tint:%s;",
+           primary, secondary, primary);
+    unsigned r, g, b;
+    if (primary[0] == '#' && strlen(primary) == 7 &&
+        sscanf(primary + 1, "%02x%02x%02x", &r, &g, &b) == 3) {
+        ss_fmt(out, "--accent-dim:rgba(%u, %u, %u, 0.12);--accent-glow:rgba(%u, %u, %u, 0.22);",
+               r, g, b, r, g, b);
+    }
+    cwist_sstring_append(out, "}</style>\n");
+}
+
+/*
  * render_page — wraps content in the full HTML page shell.
  * accent_primary / accent_secondary: CSS variable overrides (may be NULL).
+ * active_category: category id, "search", or NULL; marks the nav link.
  */
 static void render_page(blog_catalog_t *catalog,
                         const char *page_title,
@@ -684,19 +717,14 @@ static void render_page(blog_catalog_t *catalog,
     cwist_sstring_append(out, "</title>\n<link rel=\"stylesheet\" href=\"");
     cwist_sstring_append(out, root_prefix);
     cwist_sstring_append(out, "assets/styles.css\">\n");
-    /* CWIST WASI 0.2 render component loader: publishes window.CwistBlog
-     * before any page script asks for it. */
+    /* Emscripten page host (blog/ui/blog_ui.c): theme, search UI, and the
+     * CWIST component on pages that need it. In <head> so the saved theme
+     * lands as early as possible. */
     cwist_sstring_append(out, "<script src=\"");
     cwist_sstring_append(out, root_prefix);
-    cwist_sstring_append(out, "assets/cwist-runtime.js\"></script>\n");
+    cwist_sstring_append(out, "assets/blog-ui.js\"></script>\n");
     if (accent_primary && accent_secondary) {
-        cwist_sstring_append(out, "<style>:root{--accent:");
-        cwist_sstring_append(out, accent_primary);
-        cwist_sstring_append(out, ";--accent-hover:");
-        cwist_sstring_append(out, accent_secondary);
-        cwist_sstring_append(out, ";--section-tint:");
-        cwist_sstring_append(out, accent_primary);
-        cwist_sstring_append(out, ";}</style>\n");
+        render_accent_style(accent_primary, accent_secondary, out);
     }
     cwist_sstring_append(out,
         "</head>\n"
@@ -710,14 +738,6 @@ static void render_page(blog_catalog_t *catalog,
         "<footer class=\"site-footer\">\n"
         "<p>GitHub Pages</p>\n"
         "</footer>\n"
-        "<script src=\"");
-    cwist_sstring_append(out, root_prefix);
-    cwist_sstring_append(out,
-        "assets/theme-toggle.js\"></script>\n"
-        "<script src=\"");
-    cwist_sstring_append(out, root_prefix);
-    cwist_sstring_append(out,
-        "assets/home-layout-fallback.js\"></script>\n"
         "</div>\n"
         "</body>\n"
         "</html>\n");
@@ -739,9 +759,24 @@ static void build_home(blog_catalog_t *catalog, const char *out_dir) {
         "</p>\n"
         "</section>\n");
 
-    cwist_sstring_append(content,
-        "<section id=\"home-eye-candy\" class=\"home-eye-candy\""
-        " aria-live=\"polite\"></section>\n");
+    /* overview card: chips are the first five category titles */
+    cwist_sstring *chips = cwist_sstring_create();
+    cwist_sstring_assign(chips, "");
+    for (size_t i = 0, n = 0; i < catalog->count && n < 5; ++i) {
+        const char *title = catalog->items[i].title;
+        if (!catalog->items[i].id || !title || !*title) continue;
+        if (n++) cwist_sstring_append(chips, ",");
+        cwist_sstring_append(chips, title);
+    }
+    char *eye_candy = blog_render_home(
+        "블로그 빠른 둘러보기",
+        "카테고리 중심으로 최근 글 흐름을 바로 확인할 수 있습니다.",
+        chips->size ? chips->data : "포스트,카테고리,검색");
+    cwist_sstring_append(content, "<section id=\"home-eye-candy\" class=\"home-eye-candy\">");
+    if (eye_candy) cwist_sstring_append(content, eye_candy);
+    cwist_sstring_append(content, "</section>\n");
+    cwist_free(eye_candy);
+    cwist_sstring_destroy(chips);
 
     /* category grid */
     cwist_sstring_append(content,
@@ -776,9 +811,6 @@ static void build_home(blog_catalog_t *catalog, const char *out_dir) {
         cwist_sstring_append(content, "</div>\n</div>\n</a>\n");
     }
     cwist_sstring_append(content, "</div>\n</section>\n");
-
-    cwist_sstring_append(content,
-        "<script src=\"assets/home-eye-candy.js\"></script>\n");
 
     render_page(catalog, "Style and Grace", NULL, NULL, NULL, content, "", page);
 
@@ -912,10 +944,144 @@ static void build_category_page(blog_catalog_t *catalog, blog_category_t *cat,
     cwist_sstring_destroy(page);
 }
 
+/* data/comments.json, keyed "<category>/<slug>". Loaded once in main()
+ * before the scheduler starts and only read afterwards. */
+static cJSON *g_comments;
+
+static bool starts_with(const char *s, const char *prefix) {
+    return strncmp(s, prefix, strlen(prefix)) == 0;
+}
+
+/* True when an absolute http(s) URL points at another host than this site. */
+static bool is_external_url(const char *url, size_t len) {
+    const char *host = NULL;
+    if (len > 7 && strncmp(url, "http://", 7) == 0) host = url + 7;
+    else if (len > 8 && strncmp(url, "https://", 8) == 0) host = url + 8;
+    if (!host) return false;
+    size_t host_len = 0;
+    while (host + host_len < url + len && !strchr("/:?#", host[host_len])) host_len++;
+    return !(host_len == strlen(SITE_HOST) && strncasecmp(host, SITE_HOST, host_len) == 0);
+}
+
+/*
+ * finalize_article_html — md4c output fix-ups for the static page:
+ *   - <x-equation> spans become \( \) / \[ \] TeX for MathJax
+ *   - "/assets/..." src/href become relative to root (site lives under /docs/)
+ *   - links to other hosts open in a new tab
+ */
+static void finalize_article_html(const char *html, const char *root, cwist_sstring *out) {
+    bool display = false;
+    const char *p = html;
+    while (*p) {
+        if (starts_with(p, "<x-equation type=\"display\">")) {
+            cwist_sstring_append(out, "\\[");
+            display = true;
+            p += strlen("<x-equation type=\"display\">");
+        } else if (starts_with(p, "<x-equation>")) {
+            cwist_sstring_append(out, "\\(");
+            display = false;
+            p += strlen("<x-equation>");
+        } else if (starts_with(p, "</x-equation>")) {
+            cwist_sstring_append(out, display ? "\\]" : "\\)");
+            p += strlen("</x-equation>");
+        } else if (starts_with(p, "src=\"/assets/") || starts_with(p, "href=\"/assets/") ||
+                   starts_with(p, "src='/assets/") || starts_with(p, "href='/assets/")) {
+            const char *eq = strchr(p, '=');
+            cwist_sstring_append_len(out, p, (size_t)(eq - p));
+            cwist_sstring_append(out, "=\"");
+            cwist_sstring_append(out, root);
+            cwist_sstring_append(out, "assets/");
+            p = eq + strlen("=\"/assets/");
+        } else if (starts_with(p, "<a href=\"")) {
+            const char *url = p + strlen("<a href=\"");
+            const char *close = strchr(url, '"');
+            if (!close) { cwist_sstring_append(out, p); break; }
+            cwist_sstring_append_len(out, p, (size_t)(close + 1 - p));
+            if (is_external_url(url, (size_t)(close - url)))
+                cwist_sstring_append(out, " target=\"_blank\" rel=\"noopener noreferrer\"");
+            p = close + 1;
+        } else {
+            const char *next = p + 1;
+            while (*next && *next != '<' && *next != 's' && *next != 'h') next++;
+            cwist_sstring_append_len(out, p, (size_t)(next - p));
+            p = next;
+        }
+    }
+}
+
+static void render_article_body(const blog_post_t *post, const char *root, cwist_sstring *out) {
+    const char *body = post->body ? post->body : "";
+    while (isspace((unsigned char)*body)) body++;
+    if (!*body) {
+        cwist_sstring_append(out, "<p>이 게시물 본문이 비어 있습니다.</p>");
+        return;
+    }
+    char *html = blog_render_markdown(body, strlen(body), true);
+    if (!html) {
+        fprintf(stderr, "[bloggen] markdown render failed for %s\n",
+                post->source_path ? post->source_path : post->slug);
+        return;
+    }
+    finalize_article_html(html, root, out);
+    cwist_free(html);
+}
+
+/*
+ * render_comment_section — the stored comments for <category>/<slug> plus
+ * a plain GET form that opens a prefilled GitHub issue (no script needed).
+ */
+static void render_comment_section(const blog_category_t *cat, const blog_post_t *post,
+                                   cwist_sstring *out) {
+    char key[1024];
+    snprintf(key, sizeof(key), "%s/%s", cat->id, post->slug ? post->slug : "");
+    const cJSON *list = cJSON_GetObjectItemCaseSensitive(g_comments, key);
+    int count = cJSON_IsArray(list) ? cJSON_GetArraySize(list) : 0;
+
+    cwist_sstring_append(out,
+        "<section class=\"comment-section\" id=\"comment-section\">\n"
+        "<h2 class=\"comment-section-title\">댓글</h2>\n"
+        "<div class=\"comment-count\">");
+    if (count > 0) ss_fmt(out, "%d개의 댓글", count);
+    cwist_sstring_append(out, "</div>\n<div class=\"comment-list\">");
+    if (count == 0) {
+        cwist_sstring_append(out, "<p class=\"no-comments\">아직 댓글이 없습니다.</p>");
+    }
+    const cJSON *items = count > 0 ? list : NULL;
+    const cJSON *c;
+    cJSON_ArrayForEach(c, items) {
+        const cJSON *author = cJSON_GetObjectItemCaseSensitive(c, "author");
+        const cJSON *created = cJSON_GetObjectItemCaseSensitive(c, "created_at");
+        const cJSON *body = cJSON_GetObjectItemCaseSensitive(c, "body");
+        char date[11] = {0};
+        if (cJSON_IsString(created) && created->valuestring)
+            strncpy(date, created->valuestring, 10);
+        char *html = blog_render_comment(
+            cJSON_IsString(author) ? author->valuestring : "", date,
+            cJSON_IsString(body) ? body->valuestring : "");
+        if (html) cwist_sstring_append(out, html);
+        cwist_free(html);
+    }
+    cwist_sstring_append(out,
+        "</div>\n"
+        "<form class=\"comment-form\" action=\"https://github.com/" COMMENT_REPO "/issues/new\""
+        " method=\"get\" target=\"_blank\" rel=\"noopener noreferrer\">\n"
+        "<h3 class=\"comment-form-title\">댓글 작성</h3>\n"
+        "<p class=\"comment-form-note\">GitHub 계정으로 댓글을 작성할 수 있습니다.</p>\n"
+        "<input type=\"hidden\" name=\"title\" value=\"[comment] ");
+    cwist_sstring_append_escaped(out, key);
+    cwist_sstring_append(out,
+        "\">\n"
+        "<input type=\"hidden\" name=\"labels\" value=\"comment\">\n"
+        "<textarea name=\"body\" class=\"comment-textarea\" rows=\"4\""
+        " placeholder=\"댓글을 입력하세요...\" required></textarea>\n"
+        "<button class=\"comment-submit\" type=\"submit\">GitHub으로 댓글 달기</button>\n"
+        "</form>\n"
+        "</section>\n");
+}
+
 static void build_post_page(blog_catalog_t *catalog, blog_category_t *cat,
                             blog_post_t *post, const char *out_dir) {
     cwist_sstring *content = cwist_sstring_create();
-    cwist_sstring *markdown_json = cwist_sstring_create();
     cwist_sstring *page    = cwist_sstring_create();
     const char *root = "../../../";
 
@@ -965,18 +1131,24 @@ static void build_post_page(blog_catalog_t *catalog, blog_category_t *cat,
 
     cwist_sstring_append(content, "<div class=\"divider\"></div>\n");
 
-    /* article body (rendered client-side via post-renderer.js) */
-    cwist_sstring_append(content, "<div class=\"article-body\" id=\"article-body\"></div>\n");
-    cwist_sstring_assign_len(markdown_json, "", 0);
-    append_json_string(markdown_json, post->raw_markdown ? post->raw_markdown : (post->body ? post->body : ""));
-    cwist_sstring_append(content, "<script id=\"post-markdown\" type=\"application/json\">");
-    cwist_sstring_append(content, markdown_json->data ? markdown_json->data : "\"\"");
-    cwist_sstring_append(content, "</script>\n");
-    cwist_sstring_append(content, "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css\">\n");
-    cwist_sstring_append(content, "<script src=\"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js\"></script>\n");
-    cwist_sstring_append(content, "<script>window.MathJax={tex:{inlineMath:[['$','$'],[\"\\\\(\",\"\\\\)\"]],displayMath:[['$$','$$'],[\"\\\\[\",\"\\\\]\"]]},svg:{fontCache:'global'}};</script>\n");
-    cwist_sstring_append(content, "<script defer src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js\"></script>\n");
-    cwist_sstring_append(content, "<script src=\"../../../assets/post-renderer.js\"></script>\n");
+    /* article body, rendered here instead of in the browser */
+    cwist_sstring *body_html = cwist_sstring_create();
+    cwist_sstring_assign(body_html, "");
+    render_article_body(post, root, body_html);
+    const char *body = body_html->data ? body_html->data : "";
+    /* blog-ui.js loads MathJax for bodies marked data-math and runs
+     * highlight.js over code blocks. */
+    bool has_math = strchr(body, '$') || strstr(body, "\\(") || strstr(body, "\\[");
+    cwist_sstring_append(content, "<div class=\"article-body\" id=\"article-body\"");
+    if (has_math) cwist_sstring_append(content, " data-math");
+    cwist_sstring_append(content, ">");
+    cwist_sstring_append(content, body);
+    cwist_sstring_append(content, "</div>\n");
+    if (strstr(body, "<pre><code")) {
+        cwist_sstring_append(content, "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css\">\n");
+        cwist_sstring_append(content, "<script src=\"https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js\"></script>\n");
+    }
+    cwist_sstring_destroy(body_html);
 
     /* article footer: back link */
     cwist_sstring_append(content, "<footer class=\"article-footer\">\n");
@@ -988,32 +1160,8 @@ static void build_post_page(blog_catalog_t *catalog, blog_category_t *cat,
         "\xEB\xA1\x9C \xEB\x8F\x8C\xEC\x95\x84\xEA\xB0\x80\xEA\xB8\xB0"
         "</a>\n</footer>\n");
 
-    /* comment section */
-    cwist_sstring_append(content,
-        "<section class=\"comment-section\" id=\"comment-section\""
-        " data-slug=\"");
-    cwist_sstring_append(content, cat->id);
-    cwist_sstring_append(content, "/");
-    cwist_sstring_append(content, post->slug ? post->slug : "");
-    cwist_sstring_append(content,
-        "\">\n"
-        "<h2 class=\"comment-section-title\""
-        " id=\"comment-section-title\"></h2>\n"
-        "<div id=\"comment-count\" class=\"comment-count\"></div>\n"
-        "<div id=\"comment-list\" class=\"comment-list\"></div>\n"
-        "<div class=\"comment-form\">\n"
-        "<h3 id=\"comment-form-title\""
-        " class=\"comment-form-title\"></h3>\n"
-        "<p id=\"comment-form-note\""
-        " class=\"comment-form-note\"></p>\n"
-        "<textarea id=\"comment-body\" class=\"comment-textarea\""
-        " rows=\"4\"></textarea>\n"
-        "<button id=\"comment-submit\" class=\"comment-submit\""
-        " type=\"button\"></button>\n"
-        "</div>\n"
-        "</section>\n"
-        "<script src=\"../../../assets/comments.js\"></script>\n"
-        "</div>\n");
+    render_comment_section(cat, post, content);
+    cwist_sstring_append(content, "</div>\n");
 
     char page_title_buf[512];
     snprintf(page_title_buf, sizeof(page_title_buf), "%s – Style and Grace",
@@ -1030,9 +1178,7 @@ static void build_post_page(blog_catalog_t *catalog, blog_category_t *cat,
         write_file(path, page->data);
     }
 
-cleanup:
     cwist_sstring_destroy(content);
-    cwist_sstring_destroy(markdown_json);
     cwist_sstring_destroy(page);
 }
 
@@ -1139,12 +1285,13 @@ static void build_search_page(blog_catalog_t *catalog, const char *out_dir) {
         "</p>\n"
         "<div id=\"search-results\" class=\"search-results\""
         " role=\"listbox\" aria-live=\"polite\"></div>\n"
-        "</div>\n"
-        "<script src=\"../assets/search-ui.js\"></script>\n");
+        "</div>\n");
+    /* blog-ui.js finds #search-input and loads the CWIST component, which
+     * scores and renders results (PUT /search/index, POST /search). */
 
     render_page(catalog,
         "\xea\xb2\x80\xec\x83\x89 \xe2\x80\x93 Style and Grace",  /* 검색 – … */
-        NULL, NULL, NULL, content, root, page);
+        SEARCH_ACCENT_PRIMARY, SEARCH_ACCENT_SECONDARY, "search", content, root, page);
 
     char path[PATH_MAX_LEN];
     snprintf(path, sizeof(path), "%s/search/index.html", out_dir);
@@ -1155,21 +1302,163 @@ static void build_search_page(blog_catalog_t *catalog, const char *out_dir) {
 }
 
 
+/*
+ * Relations mesh: every post pair is scored with the same tag affinity the
+ * component kernel uses (blog_pair_score, blog/wasm/relations.c) and drawn
+ * as a static SVG. Hover highlighting is CSS (:has), clicking is a link.
+ */
+#define REL_W        960.0
+#define REL_H        600.0
+#define REL_MARGIN   24.0
+#define REL_LABEL_CP 18
+
+typedef struct {
+    const blog_category_t *cat;
+    const blog_post_t *post;
+    char *tags;     /* lower-cased, space-joined */
+    double x, y;
+} rel_node_t;
+
+typedef struct {
+    size_t a, b;
+    double w;
+} rel_edge_t;
+
+static int compare_rel_edges(const void *lhs, const void *rhs) {
+    const rel_edge_t *x = lhs, *y = rhs;
+    if (x->w != y->w) return x->w < y->w ? 1 : -1;
+    if (x->a != y->a) return x->a < y->a ? -1 : 1;
+    return x->b < y->b ? -1 : (x->b > y->b);
+}
+
+static double clamp_d(double v, double lo, double hi) {
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+/* Appends at most max_cp UTF-8 code points of s, HTML-escaped. */
+static void append_escaped_prefix(cwist_sstring *out, const char *s, size_t max_cp) {
+    size_t bytes = 0, cp = 0;
+    while (s[bytes] && cp < max_cp) {
+        bytes++;
+        while (((unsigned char)s[bytes] & 0xC0) == 0x80) bytes++;
+        cp++;
+    }
+    char *prefix = strndup(s, bytes);
+    if (!prefix) return;
+    cwist_sstring_append_escaped(out, prefix);
+    free(prefix);
+}
+
 static void build_relations_page(blog_catalog_t *catalog, const char *out_dir) {
     cwist_sstring *content = cwist_sstring_create();
     cwist_sstring *page    = cwist_sstring_create();
     const char *root = "../";
 
+    size_t n = 0;
+    for (size_t i = 0; i < catalog->count; ++i)
+        if (catalog->items[i].id) n += catalog->items[i].post_count;
+    rel_node_t *nodes = calloc(n ? n : 1, sizeof(*nodes));
+    rel_edge_t *edges = calloc(n > 1 ? n * (n - 1) / 2 : 1, sizeof(*edges));
+    if (!nodes || !edges) {
+        free(nodes); free(edges);
+        cwist_sstring_destroy(content); cwist_sstring_destroy(page);
+        return;
+    }
+
+    /* concentric rings around the centre, clamped into the stage */
+    double ring_gap = (REL_W < REL_H ? REL_W : REL_H) * 0.17;
+    size_t k = 0, ring = 0, in_ring = 0, ring_slots = 1;
+    for (size_t i = 0; i < catalog->count; ++i) {
+        const blog_category_t *cat = &catalog->items[i];
+        if (!cat->id) continue;
+        for (size_t j = 0; j < cat->post_count; ++j, ++k) {
+            const blog_post_t *post = &cat->posts[j];
+            if (in_ring >= ring_slots) {
+                ring++;
+                in_ring = 0;
+                ring_slots = ring * 8 > 6 ? ring * 8 : 6;
+            }
+            double angle = (2.0 * M_PI / (double)ring_slots) * (double)in_ring +
+                           (double)ring * M_PI / 8.0;
+            double radius = (double)ring * ring_gap;
+            nodes[k].cat = cat;
+            nodes[k].post = post;
+            nodes[k].x = clamp_d(REL_W / 2 + cos(angle) * radius, REL_MARGIN, REL_W - REL_MARGIN);
+            nodes[k].y = clamp_d(REL_H / 2 + sin(angle) * radius, REL_MARGIN, REL_H - REL_MARGIN);
+            in_ring++;
+
+            cwist_sstring *tags = cwist_sstring_create();
+            cwist_sstring_assign(tags, "");
+            for (size_t t = 0; t < post->tag_count; ++t) {
+                if (!post->tags[t] || !*post->tags[t]) continue;
+                if (tags->size) cwist_sstring_append(tags, " ");
+                for (const char *c = post->tags[t]; *c; ++c) {
+                    char lower = (char)tolower((unsigned char)*c);
+                    cwist_sstring_append_len(tags, &lower, 1);
+                }
+            }
+            nodes[k].tags = strdup(tags->data ? tags->data : "");
+            cwist_sstring_destroy(tags);
+        }
+    }
+
+    size_t edge_count = 0;
+    for (size_t a = 0; a < n; ++a) {
+        for (size_t b = a + 1; b < n; ++b) {
+            double w = blog_pair_score(nodes[a].tags, nodes[b].tags);
+            if (w <= 0) continue;
+            edges[edge_count++] = (rel_edge_t){ a, b, w < 10.0 ? w : 10.0 };
+        }
+    }
+    qsort(edges, edge_count, sizeof(*edges), compare_rel_edges);
+    size_t edge_cap = n * 4 > 24 ? n * 4 : 24;
+    if (edge_cap > 140) edge_cap = 140;
+    if (edge_count > edge_cap) edge_count = edge_cap;
+
     cwist_sstring_append(content,
         "<section class=\"relations-wrap\">\n"
         "<h1 class=\"search-page-title\">Relations Mesh</h1>\n"
-        "<p class=\"relations-desc\">WASM Kernel이 모든 게시물의 태그를 비교해 연결 구조를 그립니다.</p>\n"
-        "<div class=\"relations-stage\">\n"
-        "<canvas id=\"relations-canvas\" class=\"relations-canvas\" aria-label=\"post relations graph\"></canvas>\n"
-        "</div>\n"
-        "<p id=\"relations-legend\" class=\"relations-legend\">로딩 중...</p>\n"
-        "</section>\n"
-        "<script src=\"../assets/relations-ui.js\"></script>\n");
+        "<p class=\"relations-desc\">CWIST 커널이 모든 게시물의 태그를 비교해 연결 구조를 그립니다.</p>\n"
+        "<div class=\"relations-stage\">\n");
+    ss_fmt(content,
+        "<svg class=\"relations-svg\" viewBox=\"0 0 %.0f %.0f\" role=\"img\""
+        " aria-label=\"post relations graph\">\n<g class=\"rel-edges\">\n", REL_W, REL_H);
+    for (size_t i = 0; i < edge_count; ++i) {
+        const rel_node_t *a = &nodes[edges[i].a];
+        const rel_node_t *b = &nodes[edges[i].b];
+        double dx = b->x - a->x, dy = b->y - a->y;
+        double dist = sqrt(dx * dx + dy * dy);
+        double cx = (a->x + b->x) / 2 + dy * 0.08;
+        double cy = (a->y + b->y) / 2 -
+                    (pow(dist > 1 ? dist : 1, 0.62) * 0.95 + edges[i].w * 0.8);
+        ss_fmt(content,
+            "<path class=\"rel-edge e%zu e%zu\" style=\"--w:%.2fpx\""
+            " d=\"M%.1f %.1fQ%.1f %.1f %.1f %.1f\"/>\n",
+            edges[i].a, edges[i].b, 0.45 + edges[i].w * 0.16,
+            a->x, a->y, cx, cy, b->x, b->y);
+    }
+    cwist_sstring_append(content, "</g>\n<g class=\"rel-nodes\">\n");
+    for (size_t i = 0; i < n; ++i) {
+        const blog_post_t *post = nodes[i].post;
+        const char *title = post->title ? post->title : "Untitled";
+        ss_fmt(content, "<a class=\"rel-node n%zu\" href=\"%spost/%s/", i, root, nodes[i].cat->id);
+        cwist_sstring_append_escaped(content, post->slug ? post->slug : "");
+        ss_fmt(content, "/\" transform=\"translate(%.1f %.1f)\"><title>", nodes[i].x, nodes[i].y);
+        cwist_sstring_append_escaped(content, title);
+        ss_fmt(content, " · 태그 %zu개</title><rect x=\"-6\" y=\"-6\" width=\"12\" height=\"12\"/>"
+                        "<text x=\"10\" y=\"-10\">", post->tag_count);
+        append_escaped_prefix(content, title, REL_LABEL_CP);
+        cwist_sstring_append(content, "</text></a>\n");
+    }
+    cwist_sstring_append(content, "</g>\n</svg>\n<style>\n");
+    for (size_t i = 0; i < n; ++i) {
+        ss_fmt(content, ".relations-svg:has(.n%zu:hover) .e%zu", i, i);
+        cwist_sstring_append(content, i + 1 < n ? ",\n" : "");
+    }
+    if (n) cwist_sstring_append(content, "{stroke:rgba(238,179,88,.82);stroke-width:calc(var(--w) + 1.15px)}\n");
+    cwist_sstring_append(content, "</style>\n</div>\n");
+    ss_fmt(content, "<p class=\"relations-legend\">노드 %zu개 · 연결 %zu개</p>\n</section>\n",
+           n, edge_count);
 
     render_page(catalog,
         "Relations – Style and Grace",
@@ -1179,6 +1468,9 @@ static void build_relations_page(blog_catalog_t *catalog, const char *out_dir) {
     snprintf(path, sizeof(path), "%s/relations/index.html", out_dir);
     write_file(path, page->data);
 
+    for (size_t i = 0; i < n; ++i) free(nodes[i].tags);
+    free(nodes);
+    free(edges);
     cwist_sstring_destroy(content);
     cwist_sstring_destroy(page);
 }
@@ -1265,13 +1557,24 @@ static const blog_scheduler_contract_t BLOG_SCHEDULER_CONTRACT = {
 
 int main(int argc, char **argv) {
     if (argc < 5) {
-        fprintf(stderr, "Usage: %s <categories.cfg> <posts_dir> <assets_css> <out_dir>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <categories.cfg> <posts_dir> <assets_css> <out_dir>"
+                        " [comments.json]\n", argv[0]);
         return 1;
     }
     const char *categories_cfg = argv[1];
     const char *posts_dir      = argv[2];
     const char *assets_css     = argv[3];
     const char *out_dir        = argv[4];
+    const char *comments_json  = argc > 5 ? argv[5] : NULL;
+
+    if (comments_json) {
+        char *raw = read_file(comments_json, NULL);
+        g_comments = raw ? cJSON_Parse(raw) : NULL;
+        free(raw);
+        if (!cJSON_IsObject(g_comments)) {
+            fprintf(stderr, "[bloggen] ignoring unreadable comments file %s\n", comments_json);
+        }
+    }
 
     blog_catalog_t catalog = {0};
     if (!load_categories_cfg(categories_cfg, &catalog)) {
@@ -1289,12 +1592,14 @@ int main(int argc, char **argv) {
     copy_assets(assets_css, out_dir);
     if (blog_scheduler_dispatch(&catalog, out_dir, &BLOG_SCHEDULER_CONTRACT) != 0) {
         fprintf(stderr, "[bloggen] scheduler dispatch failed\n");
+        cJSON_Delete(g_comments);
         free_catalog(&catalog);
         return 1;
     }
 
     build_relations_page(&catalog, out_dir);
 
+    cJSON_Delete(g_comments);
     free_catalog(&catalog);
     return 0;
 }

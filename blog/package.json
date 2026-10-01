@@ -1,7 +1,7 @@
 {
   "name": "style-grace-cwist-blog",
   "private": true,
-  "description": "Build tooling for the CWIST WASI 0.2 render component (jco transpile + browser bundle).",
+  "description": "Build tooling for the CWIST WASI 0.2 render component (jco transpile + esbuild bundle of the jco output).",
   "devDependencies": {
     "@bytecodealliance/jco": "1.35.0",
     "@bytecodealliance/preview2-shim": "0.27.0",

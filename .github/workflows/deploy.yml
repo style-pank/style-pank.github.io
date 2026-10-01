@@ -6,6 +6,7 @@ on:
     paths:
       - "posts/**"
       - "categories.cfg"
+      - "data/**"
       - "assets/**"
       - "tools/**"
       - "blog/**"
@@ -68,6 +69,17 @@ jobs:
       - name: Build CWIST WASI 0.2 render component
         run: make wasm-blog WASI_SDK="$HOME/toolchains/wasi-sdk-25.0-x86_64-linux"
 
+      # DOM, events and storage are outside WASI 0.2: the page host is C
+      # built with Emscripten (blog/ui/blog_ui.c -> assets/blog-ui.{js,wasm}).
+      - name: Set up Emscripten SDK
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '5.0.0'
+          actions-cache-folder: '.emsdk-cache'
+
+      - name: Build Emscripten page host
+        run: make ui-blog
+
       - name: Generate static site from root posts
         id: static_build
         continue-on-error: true
@@ -77,7 +89,6 @@ jobs:
         if: steps.static_build.outcome != 'success'
         run: |
           python3 - <<'PY'
-          import json
           import shutil
           from pathlib import Path
           from html import escape
@@ -91,28 +102,15 @@ jobs:
               shutil.rmtree(docs_root)
           (docs_root / "assets").mkdir(parents=True, exist_ok=True)
           (docs_root / "post").mkdir(parents=True, exist_ok=True)
-          (docs_root / "data").mkdir(parents=True, exist_ok=True)
 
           for asset in [
               "styles.css",
-              "post-renderer.js",
-              "theme-toggle.js",
-              "comments.js",
-              "search-ui.js",
-              "cwist-runtime.js",
-              "cwist-blog.mjs",
-              "blog.component.core.wasm",
-              "blog.component.core2.wasm",
+              "blog-ui.js",
+              "blog-ui.wasm",
           ]:
               src = root / "assets" / asset
               if src.exists():
                   shutil.copy2(src, docs_root / "assets" / asset)
-
-          comments_src = root / "data" / "comments.json"
-          if comments_src.exists():
-              shutil.copy2(comments_src, docs_root / "data" / "comments.json")
-          else:
-              (docs_root / "data" / "comments.json").write_text("{}", encoding="utf-8")
 
           title_re = re.compile(r'^title:\s*(.+?)\s*$', re.IGNORECASE)
           posts = []
@@ -138,15 +136,13 @@ jobs:
             <meta name="viewport" content="width=device-width, initial-scale=1" />
             <title>{escape(title)} - Style and Grace</title>
             <link rel="stylesheet" href="../../../assets/styles.css" />
+            <script src="../../../assets/blog-ui.js"></script>
           </head>
           <body>
             <main class="content-wrap article-wrap">
               <h1>{escape(title)}</h1>
               <div class="divider"></div>
-              <div class="article-body" id="article-body"></div>
-              <script id="post-markdown" type="application/json">{json.dumps(text, ensure_ascii=False)}</script>
-              <script src="../../../assets/cwist-runtime.js"></script>
-              <script src="../../../assets/post-renderer.js"></script>
+              <pre class="article-body">{escape(text)}</pre>
             </main>
           </body>
           </html>
@@ -171,7 +167,7 @@ jobs:
           <body>
             <main class="content-wrap">
               <h1>Style and Grace</h1>
-              <p>정적 렌더가 실패하여 live markdown 렌더 fallback 페이지로 제공됩니다.</p>
+              <p>정적 렌더가 실패하여 원문 markdown fallback 페이지로 제공됩니다.</p>
               <ul>{index_items}</ul>
             </main>
           </body>

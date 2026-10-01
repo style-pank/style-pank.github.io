@@ -2,7 +2,8 @@
  * Style and Grace render kernel, shared by the CWIST guest component.
  *
  * Every function returns a heap string owned by the caller (cwist_free), or
- * NULL on failure. The guest (blog_guest.c) exposes them as routes of an
+ * NULL on failure. tools/generate_static.c links them natively to render
+ * pages at build time; the guest (blog_guest.c) serves search through an
  * in-memory cwist_app dispatched through the cwist-guest WIT world.
  */
 #ifndef STYLE_GRACE_BLOG_H
@@ -29,14 +30,7 @@ float blog_score(const char *query, const char *title, const char *tags,
 /* Tag affinity between two space-separated tag lists. */
 float blog_pair_score(const char *tags_a, const char *tags_b);
 
-/* {"edges":[{"a":i,"b":j,"w":score},...]} over every post pair of the index. */
-char *blog_relations_json(const void *index /* cJSON* */);
-
 /* Home overview card (title, description, comma-separated chips). */
 char *blog_render_home(const char *title, const char *description, const char *chips_csv);
-
-/* {"section":..,"accent":..,"hover":..,"rgb":[r,g,b]} for a page path, or
- * {"section":""} when the path belongs to no section. */
-char *blog_theme_json(const char *path);
 
 #endif

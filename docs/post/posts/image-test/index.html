@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>이미지 첨부 테스트 – Style and Grace</title>
 <link rel="stylesheet" href="../../../assets/styles.css">
-<script src="../../../assets/cwist-runtime.js"></script>
-<style>:root{--accent:#a84a43;--accent-hover:#cf8a7e;--section-tint:#a84a43;}</style>
+<script src="../../../assets/blog-ui.js"></script>
+<style>:root{--accent:#a84a43;--accent-hover:#cf8a7e;--section-tint:#a84a43;--accent-dim:rgba(168, 74, 67, 0.12);--accent-glow:rgba(168, 74, 67, 0.22);}</style>
 </head>
 <body>
 <div class="site-wrap">
@@ -39,36 +39,41 @@
 </div>
 </header>
 <div class="divider"></div>
-<div class="article-body" id="article-body"></div>
-<script id="post-markdown" type="application/json">"---\ntitle: 이미지 첨부 테스트\ndate: 2026-05-01\nexcerpt: 마크다운에서 이미지를 첨부하는 방법을 테스트합니다.\ntags: test, image\n---\n\n# 이미지 첨부 테스트\n\n이 포스트는 마크다운에서 이미지를 첨부하는 기능을 테스트하기 위해 작성되었습니다.\n\n## 방법 1: 절대 경로 사용 (권장)\n\nGitHub Pages의 루트를 기준으로 한 경로를 사용합니다.\n\n`![샘플 이미지](/assets/images/sample.jpg)`\n\n![샘플 이미지](/assets/images/sample.jpg)\n\n## 방법 2: 상대 경로 사용\n\n현재 포스트 위치(`post/general/image-test/`)를 기준으로 한 상대 경로를 사용합니다.\n\n`![샘플 이미지](../../../assets/images/sample.jpg)`\n\n![샘플 이미지](../../../assets/images/sample.jpg)\n\n---\n\n위의 두 방법 모두 이미지가 정상적으로 출력되어야 합니다.\n"</script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script>window.MathJax={tex:{inlineMath:[['$','$'],["\\(","\\)"]],displayMath:[['$$','$$'],["\\[","\\]"]]},svg:{fontCache:'global'}};</script>
-<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
-<script src="../../../assets/post-renderer.js"></script>
+<div class="article-body" id="article-body"><h1>이미지 첨부 테스트</h1>
+<p>이 포스트는 마크다운에서 이미지를 첨부하는 기능을 테스트하기 위해 작성되었습니다.</p>
+<h2>방법 1: 절대 경로 사용 (권장)</h2>
+<p>GitHub Pages의 루트를 기준으로 한 경로를 사용합니다.</p>
+<p><code>![샘플 이미지](/assets/images/sample.jpg)</code></p>
+<p><img src="../../../assets/images/sample.jpg" alt="샘플 이미지"></p>
+<h2>방법 2: 상대 경로 사용</h2>
+<p>현재 포스트 위치(<code>post/general/image-test/</code>)를 기준으로 한 상대 경로를 사용합니다.</p>
+<p><code>![샘플 이미지](../../../assets/images/sample.jpg)</code></p>
+<p><img src="../../../assets/images/sample.jpg" alt="샘플 이미지"></p>
+<hr>
+<p>위의 두 방법 모두 이미지가 정상적으로 출력되어야 합니다.</p>
+</div>
 <footer class="article-footer">
 <a class="back-link" href="../../../category/posts/">&larr; Posts로 돌아가기</a>
 </footer>
-<section class="comment-section" id="comment-section" data-slug="posts/image-test">
-<h2 class="comment-section-title" id="comment-section-title"></h2>
-<div id="comment-count" class="comment-count"></div>
-<div id="comment-list" class="comment-list"></div>
-<div class="comment-form">
-<h3 id="comment-form-title" class="comment-form-title"></h3>
-<p id="comment-form-note" class="comment-form-note"></p>
-<textarea id="comment-body" class="comment-textarea" rows="4"></textarea>
-<button id="comment-submit" class="comment-submit" type="button"></button>
-</div>
+<section class="comment-section" id="comment-section">
+<h2 class="comment-section-title">댓글</h2>
+<div class="comment-count"></div>
+<div class="comment-list"><p class="no-comments">아직 댓글이 없습니다.</p></div>
+<form class="comment-form" action="https://github.com/style-pank/style-pank.github.io/issues/new" method="get" target="_blank" rel="noopener noreferrer">
+<h3 class="comment-form-title">댓글 작성</h3>
+<p class="comment-form-note">GitHub 계정으로 댓글을 작성할 수 있습니다.</p>
+<input type="hidden" name="title" value="[comment] posts/image-test">
+<input type="hidden" name="labels" value="comment">
+<textarea name="body" class="comment-textarea" rows="4" placeholder="댓글을 입력하세요..." required></textarea>
+<button class="comment-submit" type="submit">GitHub으로 댓글 달기</button>
+</form>
 </section>
-<script src="../../../assets/comments.js"></script>
 </div>
 
 </main>
 <footer class="site-footer">
 <p>GitHub Pages</p>
 </footer>
-<script src="../../../assets/theme-toggle.js"></script>
-<script src="../../../assets/home-layout-fallback.js"></script>
 </div>
 </body>
 </html>
